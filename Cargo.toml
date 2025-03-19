@@ -1,0 +1,27 @@
+[package]
+name = "nihility"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nihility-common = { path = "common", version = "0.1.0" }
+
+tracing-subscriber = { version = "0.3", features = ["local-time", "ansi", "fmt", "std"] }
+tracing-appender = { version = "0.2" }
+time = { version = "0.3", default-features = false, features = ["parsing"] }
+
+tokio = { workspace = true, features = ["macros"] }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+
+[workspace.dependencies]
+tokio = { version = "1.44", default-features = false, features = ["sync", "rt", "rt-multi-thread", "tracing"] }
+anyhow = { version = "1", default-features = false }
+tracing = { version = "0.1" }
+uuid = { version = "1.7", default-features = false, features = ["v4"] }
+serde = { version = "1.0", features = ["derive"] }
+
+[workspace]
+members = ["common", "plugins/*"]
