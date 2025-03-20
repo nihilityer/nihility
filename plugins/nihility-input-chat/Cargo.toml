@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 onebot_v11 = { version = "0.1", default-features = false }
+serde_json = { version = "1.0", default-features = false }
 
 nihility-common = { workspace = true }
 
