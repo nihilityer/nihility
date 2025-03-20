@@ -1,12 +1,15 @@
 [package]
-name = "nihility-input-chat-bot"
+name = "nihility-input-chat"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 onebot_v11 = { version = "0.1", default-features = false }
 
+nihility-common = { workspace = true }
+
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
+lazy_static = { workspace = true }

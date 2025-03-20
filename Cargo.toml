@@ -3,12 +3,18 @@ name = "nihility"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+chat-bot = ["nihility-input-chat"]
+
 [dependencies]
-nihility-common = { path = "common", version = "0.1.0" }
+nihility-common = { workspace = true }
+nihility-input-chat = { path = "plugins/nihility-input-chat", optional = true }
 
 tracing-subscriber = { version = "0.3", features = ["local-time", "ansi", "fmt", "std"] }
 tracing-appender = { version = "0.2" }
 time = { version = "0.3", default-features = false, features = ["parsing"] }
+figment = { version = "0.10", features = ["json", "toml", "yaml"] }
+toml = { version = "0.8", default-features = false, features = ["display"] }
 
 tokio = { workspace = true, features = ["macros"] }
 anyhow = { workspace = true }
@@ -17,11 +23,14 @@ uuid = { workspace = true }
 serde = { workspace = true }
 
 [workspace.dependencies]
+nihility-common = { path = "common", version = "0.1.0" }
+
 tokio = { version = "1.44", default-features = false, features = ["sync", "rt", "rt-multi-thread", "tracing"] }
 anyhow = { version = "1", default-features = false }
 tracing = { version = "0.1" }
 uuid = { version = "1.7", default-features = false, features = ["v4"] }
 serde = { version = "1.0", features = ["derive"] }
+lazy_static = { version = "1", default-features = false }
 
 [workspace]
 members = ["common", "plugins/*"]

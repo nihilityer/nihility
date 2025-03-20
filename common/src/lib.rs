@@ -62,4 +62,10 @@ pub async fn sender_chat_output(output: OutputEntity) -> Result<usize> {
 pub trait AssistantInput {
     /// 获取消息输入订阅
     fn subscribe(&self) -> Result<Receiver<InputEntity>>;
+
+    /// 发送输入
+    fn sender_input(&self, input: InputEntity) -> Result<usize>;
+    
+    /// 获取当前输入的Id
+    fn get_id(&self) -> Result<Uuid>;
 }
