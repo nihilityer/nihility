@@ -2,14 +2,14 @@ pub mod context;
 pub mod input;
 pub mod output;
 
-use crate::input::{ InputEntity};
+use crate::input::InputEntity;
+use crate::output::OutputEntity;
 use anyhow::Result;
 use lazy_static::lazy_static;
-use tokio::sync::{Mutex, mpsc, broadcast};
 use tokio::sync::broadcast::Receiver;
+use tokio::sync::{Mutex, broadcast, mpsc};
 use tracing::error;
 use uuid::Uuid;
-use crate::output::OutputEntity;
 
 lazy_static! {
     static ref GLOBAL_SENDER: Mutex<Option<mpsc::Sender<InputEntity>>> = Mutex::new(None);
@@ -27,24 +27,21 @@ pub async fn init_input_sender(buffer: usize) -> mpsc::Receiver<InputEntity> {
 }
 
 /// 注册一个信息输入组件
-pub async fn register_input_plugin(plugin: &dyn AssistantInput) -> Result<Uuid> {
+pub async fn register_input_plugin(mut receiver: Receiver<InputEntity>) -> Result<Uuid> {
     match GLOBAL_SENDER.lock().await.clone() {
         None => Err(anyhow::anyhow!("Global sender not initialized")),
-        Some(sender) => match plugin.subscribe() {
-            Ok(mut receiver) => {
-                let uuid = Uuid::new_v4();
-                let plugin_name = uuid;
-                tokio::spawn(async move {
-                    while let Ok(input) = receiver.recv().await {
-                        if let Err(e) = sender.send(input).await {
-                            error!("{} Error sending input: {:?}", plugin_name, e);
-                        }
+        Some(sender) => {
+            let uuid = Uuid::new_v4();
+            let plugin_name = uuid;
+            tokio::spawn(async move {
+                while let Ok(input) = receiver.recv().await {
+                    if let Err(e) = sender.send(input).await {
+                        error!("{} Error sending input: {:?}", plugin_name, e);
                     }
-                });
-                Ok(uuid)
-            }
-            Err(e) => Err(anyhow::anyhow!("Get subscribe error: {}", e)),
-        },
+                }
+            });
+            Ok(uuid)
+        }
     }
 }
 
@@ -56,16 +53,4 @@ pub async fn register_chat_output_plugin() -> broadcast::Receiver<OutputEntity> 
 /// 发送聊天输出
 pub async fn sender_chat_output(output: OutputEntity) -> Result<usize> {
     Ok(CHAT_OUTPUT.lock().await.send(output)?)
-}
-
-/// 信息输入组件
-pub trait AssistantInput {
-    /// 获取消息输入订阅
-    fn subscribe(&self) -> Result<Receiver<InputEntity>>;
-
-    /// 发送输入
-    fn sender_input(&self, input: InputEntity) -> Result<usize>;
-    
-    /// 获取当前输入的Id
-    fn get_id(&self) -> Result<Uuid>;
 }

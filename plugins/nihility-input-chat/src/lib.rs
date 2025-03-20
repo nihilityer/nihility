@@ -12,12 +12,12 @@ use crate::handle_request::handle_request;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use nihility_common::input::InputEntity;
-use nihility_common::{AssistantInput, register_input_plugin, register_chat_output_plugin};
+use nihility_common::{register_chat_output_plugin, register_input_plugin};
 use onebot_v11::Event;
 pub use onebot_v11::connect::ws::WsConfig;
 use onebot_v11::connect::ws::WsConnect;
 use std::sync::Arc;
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::broadcast::Sender;
 use tokio::sync::{Mutex, broadcast};
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -33,23 +33,6 @@ pub struct NihilityChatInput {
     pub ws_connect: Arc<WsConnect>,
 }
 
-impl AssistantInput for NihilityChatInput {
-    fn subscribe(&self) -> Result<Receiver<InputEntity>> {
-        Ok(self.bot_sender.subscribe())
-    }
-
-    fn sender_input(&self, input: InputEntity) -> Result<usize> {
-        Ok(self.bot_sender.send(input)?)
-    }
-
-    fn get_id(&self) -> Result<Uuid> {
-        match self.id {
-            None => Err(anyhow::anyhow!("Id not initialized")),
-            Some(id) => Ok(id),
-        }
-    }
-}
-
 impl NihilityChatInput {
     pub async fn init(ws_config: &WsConfig) -> Result<()> {
         info!("Initializing Nihility Chat Input");
@@ -61,9 +44,10 @@ impl NihilityChatInput {
             bot_sender: tx,
             ws_connect: connect,
         };
-        core.id.replace(register_input_plugin(&core).await?);
+        core.id
+            .replace(register_input_plugin(core.bot_sender.subscribe()).await?);
         CORE.lock().await.replace(core);
-        
+
         tokio::spawn(async move {
             while let Ok(input_entity) = receiver.recv().await {
                 match input_entity {
@@ -84,8 +68,19 @@ impl NihilityChatInput {
                 warn!("Received chat should output {:?}", output_entity);
             }
         });
-        
+
         Ok(())
+    }
+
+    fn sender_input(&self, input: InputEntity) -> Result<usize> {
+        Ok(self.bot_sender.send(input)?)
+    }
+
+    fn get_id(&self) -> Result<Uuid> {
+        match self.id {
+            None => Err(anyhow::anyhow!("Id not initialized")),
+            Some(id) => Ok(id),
+        }
     }
 }
 
