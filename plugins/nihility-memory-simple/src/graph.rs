@@ -1,0 +1,148 @@
+use crate::openie::OpenIEProcessor;
+use crate::{EmbeddingClient, HippoRAGRetriever};
+use anyhow::{Result, anyhow};
+use petgraph::{Graph, graph::NodeIndex};
+use std::collections::HashMap;
+use tracing::debug;
+
+#[derive(Debug, Clone)]
+pub struct KnowledgeNode {
+    pub text: String,
+    pub embedding: Vec<f32>,
+    pub specificity: f32,
+}
+
+#[derive(Clone)]
+pub struct KnowledgeGraph {
+    pub graph: Graph<KnowledgeNode, f32>,
+    pub node_indices: HashMap<String, NodeIndex>,
+}
+
+impl Default for KnowledgeGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KnowledgeGraph {
+    pub fn new() -> Self {
+        Self {
+            graph: Graph::new(),
+            node_indices: HashMap::new(),
+        }
+    }
+
+    pub fn add_node(&mut self, text: String, embedding: Vec<f32>) -> NodeIndex {
+        let node = KnowledgeNode {
+            text: text.clone(),
+            embedding,
+            specificity: 1.0,
+        };
+        let idx = self.graph.add_node(node);
+        self.node_indices.insert(text, idx);
+        idx
+    }
+
+    pub async fn add_knowledge<T: Into<String>>(
+        &mut self,
+        text: T,
+        openie: &OpenIEProcessor,
+        embed_client: &EmbeddingClient,
+    ) -> Result<()> {
+        // Step 1: 信息抽取
+        let triples = openie.extract_triples(text).await?;
+        debug!("triples: {:?}", triples);
+
+        // Step 2: 处理三元组
+        for triple in triples {
+            let subject_embed = embed_client.get_embedding(&triple.subject).await?;
+            let object_embed = embed_client.get_embedding(&triple.object).await?;
+
+            // 添加或更新节点
+            let subj_idx = self.get_or_create_node(&triple.subject, subject_embed);
+            let obj_idx = self.get_or_create_node(&triple.object, object_embed);
+
+            // TODO relation没有使用到,关系查询还有问题
+            // 添加关系边
+            self.graph.add_edge(subj_idx, obj_idx, triple.confidence);
+        }
+
+        // Step 3: 更新特异性
+        self.update_specificity();
+        Ok(())
+    }
+
+    fn get_or_create_node(&mut self, text: &str, embedding: Vec<f32>) -> NodeIndex {
+        if let Some(&idx) = self.node_indices.get(text) {
+            idx
+        } else {
+            self.add_node(text.to_string(), embedding)
+        }
+    }
+
+    fn update_specificity(&mut self) {
+        let total_nodes = self.graph.node_count() as f32;
+        for node in self.graph.node_weights_mut() {
+            node.specificity = 1.0 / total_nodes;
+        }
+    }
+
+    pub async fn query<T: Into<String>>(
+        &self,
+        question: T,
+        retriever: &HippoRAGRetriever,
+        openie: &OpenIEProcessor,
+        embed_client: &EmbeddingClient,
+    ) -> Result<Vec<String>> {
+        // Step 1: 问题解析
+        let entities = self.extract_query_entities(question, openie).await?;
+        debug!("entities: {:?}", entities);
+
+        // Step 2: 获取嵌入
+        let mut query_nodes = Vec::new();
+        for entity in entities {
+            let embed = embed_client.get_embedding(&entity).await?;
+            if let Some(closest) = self.find_closest_node(&embed) {
+                query_nodes.push(closest.text.clone());
+            }
+        }
+
+        // Step 3: 执行检索
+        let results = retriever.personalized_pagerank(self, &query_nodes)?;
+        debug!("results: {:?}", results);
+
+        Ok(results
+            .into_iter()
+            .take(5)
+            .map(|(node, _)| node.clone())
+            .collect())
+    }
+
+    async fn extract_query_entities<T: Into<String>>(
+        &self,
+        question: T,
+        openie: &OpenIEProcessor,
+    ) -> Result<Vec<String>> {
+        let prompt = format!("Extract key entities from: {}", question.into());
+        let triples = openie.extract_triples(&prompt).await?;
+        debug!("triples: {:?}", triples);
+
+        Ok(triples
+            .into_iter()
+            .flat_map(|t| vec![t.subject, t.object])
+            .collect())
+    }
+
+    fn find_closest_node(&self, embedding: &[f32]) -> Option<&KnowledgeNode> {
+        self.graph.node_weights().min_by_key(|node| {
+            // 使用余弦相似度简化计算
+            let dot_product: f32 = node
+                .embedding
+                .iter()
+                .zip(embedding)
+                .map(|(a, b)| a * b)
+                .sum();
+            (dot_product * -1.0e6) as i32
+        })
+    }
+}

@@ -1,13 +1,15 @@
+use crate::log::LogConfig;
+use anyhow::Result;
+use figment::Figment;
+use figment::providers::{Format, Json, Serialized, Toml, Yaml};
+#[cfg(feature = "chat-bot")]
+use nihility_input_chat::WsConfig;
+#[cfg(feature = "simple-memory")]
+use nihility_memory_simple::NihilitySimpleMemoryConfig;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use figment::Figment;
-use figment::providers::{Format, Json, Serialized, Toml, Yaml};
-use serde::{Deserialize, Serialize};
-use anyhow::Result;
-#[cfg(feature = "chat-bot")]
-use nihility_input_chat::WsConfig;
-use crate::log::LogConfig;
 
 const JSON_CONFIG_FILE_NAME: &str = "config.json";
 const TOML_CONFIG_FILE_NAME: &str = "config.toml";
@@ -17,7 +19,9 @@ const YAML_CONFIG_FILE_NAME: &str = "config.yaml";
 pub struct NihilityConfig {
     pub log: Vec<LogConfig>,
     #[cfg(feature = "chat-bot")]
-    pub chat_bot: WsConfig
+    pub chat_bot: WsConfig,
+    #[cfg(feature = "simple-memory")]
+    pub simple_memory: NihilitySimpleMemoryConfig,
 }
 
 impl Default for NihilityConfig {
@@ -25,7 +29,14 @@ impl Default for NihilityConfig {
         Self {
             log: vec![LogConfig::default()],
             #[cfg(feature = "chat-bot")]
-            chat_bot: WsConfig::default()
+            chat_bot: WsConfig::default(),
+            #[cfg(feature = "simple-memory")]
+            simple_memory: NihilitySimpleMemoryConfig {
+                embedding_model: "text-embedding-v3".to_string(),
+                openie_model: "qwen-plus".to_string(),
+                api_base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string(),
+                api_key: "".to_string(),
+            },
         }
     }
 }
@@ -38,7 +49,7 @@ impl NihilityConfig {
                 Figment::from(Serialized::defaults(config)),
                 Toml::file(TOML_CONFIG_FILE_NAME),
             )
-                .extract()?)
+            .extract()?)
         } else if Path::try_exists(YAML_CONFIG_FILE_NAME.as_ref())? {
             Ok(Figment::from(Serialized::defaults(config))
                 .merge(Yaml::file(YAML_CONFIG_FILE_NAME))

@@ -11,8 +11,8 @@ use crate::handle_notice::handle_notice;
 use crate::handle_request::handle_request;
 use anyhow::Result;
 use lazy_static::lazy_static;
-use nihility_common::input::InputEntity;
-use nihility_common::{register_chat_output_plugin, register_input_plugin};
+use nihility_common::inspiration::Inspiration;
+use nihility_common::{register_chat_output_plugin, register_inspiration_plugin};
 use onebot_v11::Event;
 pub use onebot_v11::connect::ws::WsConfig;
 use onebot_v11::connect::ws::WsConnect;
@@ -29,7 +29,7 @@ lazy_static! {
 #[derive(Clone)]
 pub struct NihilityChatInput {
     pub id: Option<Uuid>,
-    pub bot_sender: Sender<InputEntity>,
+    pub bot_sender: Sender<Inspiration>,
     pub ws_connect: Arc<WsConnect>,
 }
 
@@ -45,7 +45,7 @@ impl NihilityChatInput {
             ws_connect: connect,
         };
         core.id
-            .replace(register_input_plugin(core.bot_sender.subscribe()).await?);
+            .replace(register_inspiration_plugin(core.bot_sender.subscribe()).await?);
         CORE.lock().await.replace(core);
 
         tokio::spawn(async move {
@@ -72,28 +72,14 @@ impl NihilityChatInput {
         Ok(())
     }
 
-    fn sender_input(&self, input: InputEntity) -> Result<usize> {
+    fn sender_input(&self, input: Inspiration) -> Result<usize> {
         Ok(self.bot_sender.send(input)?)
-    }
-
-    fn get_id(&self) -> Result<Uuid> {
-        match self.id {
-            None => Err(anyhow::anyhow!("Id not initialized")),
-            Some(id) => Ok(id),
-        }
     }
 }
 
-pub(crate) async fn sender(input: InputEntity) -> Result<usize> {
+pub(crate) async fn sender(input: Inspiration) -> Result<usize> {
     match CORE.lock().await.as_ref() {
         None => Err(anyhow::anyhow!("Core not initialized")),
         Some(core) => core.sender_input(input),
-    }
-}
-
-pub(crate) async fn self_id() -> Result<Uuid> {
-    match CORE.lock().await.as_ref() {
-        None => Err(anyhow::anyhow!("Core not initialized")),
-        Some(core) => core.get_id(),
     }
 }

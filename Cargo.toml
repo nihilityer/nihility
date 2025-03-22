@@ -5,10 +5,12 @@ edition = "2024"
 
 [features]
 chat-bot = ["nihility-input-chat"]
+simple-memory = ["nihility-memory-simple"]
 
 [dependencies]
 nihility-common = { workspace = true }
 nihility-input-chat = { path = "plugins/nihility-input-chat", optional = true }
+nihility-memory-simple = { path = "plugins/nihility-memory-simple", optional = true }
 
 tracing-subscriber = { version = "0.3", features = ["local-time", "ansi", "fmt", "std"] }
 tracing-appender = { version = "0.2" }

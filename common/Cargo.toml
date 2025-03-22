@@ -8,4 +8,5 @@ tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
+serde = { workspace = true }
 lazy_static = { workspace = true }

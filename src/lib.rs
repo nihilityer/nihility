@@ -2,21 +2,24 @@ pub mod config;
 pub mod log;
 
 use anyhow::Result;
-use nihility_common::input::InputEntity;
-use nihility_common::output::{Output, OutputEntity};
-use nihility_common::sender_chat_output;
+use nihility_common::idea::{ChatIdea, Idea};
+use nihility_common::inspiration::Inspiration;
+use nihility_common::sender_memory_idea;
 use tokio::sync::mpsc::Receiver;
-use tracing::info;
+use tracing::{info, warn};
 
-pub async fn run(mut input_receiver: Receiver<InputEntity>) -> Result<()> {
+pub async fn run(mut input_receiver: Receiver<Inspiration>) -> Result<()> {
     info!("Starting core thread");
     while let Some(entity) = input_receiver.recv().await {
         info!("{:?}", entity);
-        sender_chat_output(OutputEntity {
-            context: entity.context.clone(),
-            input: Output::Text("收到消息了".to_string()),
-        })
-        .await?;
+        match entity {
+            Inspiration::ChatApp(chat_inspiration) => {
+                sender_memory_idea(Idea::Memory(ChatIdea::Query(chat_inspiration))).await?;
+            }
+            Inspiration::Memory(memory_inspiration) => {
+                warn!("Received inspiration: {:?}", memory_inspiration);
+            }
+        }
     }
     Ok(())
 }
