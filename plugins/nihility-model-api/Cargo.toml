@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 async-openai = { version = "0.28" }
-serde_json = { version = "1.0", default-features = false }
 
 nihility-common = { workspace = true }
 
@@ -13,3 +12,4 @@ anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 async-trait = { workspace = true }
+serde_json = { workspace = true }

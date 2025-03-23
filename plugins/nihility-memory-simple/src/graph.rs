@@ -1,10 +1,10 @@
-use anyhow::{Result};
+use crate::retrieval::HippoRAGRetriever;
+use anyhow::Result;
 use nihility_common::model::{get_chat_completion, get_embedding};
 use petgraph::{graph::NodeIndex, stable_graph::StableDiGraph};
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::debug;
-use crate::retrieval::HippoRAGRetriever;
 
 static SYSTEM_PROMPT: &str = "You are a precise information extraction system. Extract relationships with confidence scores.";
 
@@ -60,10 +60,7 @@ impl KnowledgeGraph {
         idx
     }
 
-    pub async fn add_knowledge<T: Into<String>>(
-        &mut self,
-        text: T,
-    ) -> Result<()> {
+    pub async fn add_knowledge<T: Into<String>>(&mut self, text: T) -> Result<()> {
         // Step 1: 信息抽取
         let triples = extract_triples(text).await?;
         debug!("triples: {:?}", triples);
@@ -170,9 +167,7 @@ pub async fn extract_triples<T: Into<String>>(text: T) -> Result<Vec<KnowledgeTr
         "#,
         text.into()
     );
-    Ok(serde_json::from_str(
-        get_chat_completion(&SYSTEM_PROMPT.to_string(), &prompt)
-            .await?
-            .as_str(),
+    Ok(serde_json::from_value(
+        get_chat_completion(SYSTEM_PROMPT.to_string(), prompt).await?,
     )?)
 }

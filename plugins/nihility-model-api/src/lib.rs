@@ -8,10 +8,12 @@ use async_openai::types::{
 };
 use async_trait::async_trait;
 use nihility_common::model::NihilityModel;
+use nihility_common::set_model;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::ops::Add;
 use tracing::debug;
-use nihility_common::set_model;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NihilityApiModelConfig {
@@ -51,41 +53,35 @@ impl NihilityModel for NihilityApiModel {
             .build()?;
         debug!("request: {:?}", request);
         let response = self.client.embeddings().create(request).await?;
-        // debug!("response: {:?}", response);
+        debug!("response: {:?}", response);
         Ok(response.data[0].embedding.clone())
     }
 
-    async fn get_chat_completion(&self, system: &String, user: &String) -> Result<String> {
+    async fn get_chat_completion(&self, system: String, user: String) -> Result<Value> {
         let messages = vec![
             ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
-                content: system.clone().into(),
+                content: system.into(),
                 name: None,
             }),
             ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-                content: user.clone().into(),
+                content: user.into(),
                 name: None,
             }),
         ];
-        debug!("messages: {:?}", messages);
-        let response = self
-            .client
-            .chat()
-            .create(
-                CreateChatCompletionRequestArgs::default()
-                    .model(&self.config.chat_completion_model)
-                    .messages(messages)
-                    .response_format(ResponseFormat::JsonObject)
-                    .temperature(0.0)
-                    .build()?,
-            )
-            .await?;
-        // debug!("response: {:?}", response);
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(&self.config.chat_completion_model)
+            .messages(messages)
+            .response_format(ResponseFormat::JsonObject)
+            .temperature(0.0)
+            .build()?;
+        debug!("request: {:?}", request);
+        let response = self.client.chat().create(request).await?;
+        debug!("response: {:?}", response);
         let json_str = response.choices[0]
             .message
             .content
             .as_ref()
             .ok_or(serde_json::Error::custom("No content"))?;
-        debug!("json_str: {}", json_str);
-        Ok(json_str.to_string())
+        Ok(serde_json::from_str::<Value>(json_str)?)
     }
 }
