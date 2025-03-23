@@ -1,9 +1,12 @@
-use crate::openie::OpenIEProcessor;
-use crate::{EmbeddingClient, HippoRAGRetriever};
-use anyhow::{Result, anyhow};
-use petgraph::{Graph, graph::NodeIndex};
+use anyhow::{Result};
+use nihility_common::model::{get_chat_completion, get_embedding};
+use petgraph::{graph::NodeIndex, stable_graph::StableDiGraph};
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 use tracing::debug;
+use crate::retrieval::HippoRAGRetriever;
+
+static SYSTEM_PROMPT: &str = "You are a precise information extraction system. Extract relationships with confidence scores.";
 
 #[derive(Debug, Clone)]
 pub struct KnowledgeNode {
@@ -12,9 +15,23 @@ pub struct KnowledgeNode {
     pub specificity: f32,
 }
 
+#[derive(Debug, Clone)]
+pub struct KnowledgeEdge {
+    pub relation: String,
+    pub confidence: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KnowledgeTriple {
+    pub subject: String,
+    pub relation: String,
+    pub object: String,
+    pub confidence: f32,
+}
+
 #[derive(Clone)]
 pub struct KnowledgeGraph {
-    pub graph: Graph<KnowledgeNode, f32>,
+    pub graph: StableDiGraph<KnowledgeNode, KnowledgeEdge>,
     pub node_indices: HashMap<String, NodeIndex>,
 }
 
@@ -27,7 +44,7 @@ impl Default for KnowledgeGraph {
 impl KnowledgeGraph {
     pub fn new() -> Self {
         Self {
-            graph: Graph::new(),
+            graph: StableDiGraph::new(),
             node_indices: HashMap::new(),
         }
     }
@@ -46,25 +63,29 @@ impl KnowledgeGraph {
     pub async fn add_knowledge<T: Into<String>>(
         &mut self,
         text: T,
-        openie: &OpenIEProcessor,
-        embed_client: &EmbeddingClient,
     ) -> Result<()> {
         // Step 1: 信息抽取
-        let triples = openie.extract_triples(text).await?;
+        let triples = extract_triples(text).await?;
         debug!("triples: {:?}", triples);
 
         // Step 2: 处理三元组
         for triple in triples {
-            let subject_embed = embed_client.get_embedding(&triple.subject).await?;
-            let object_embed = embed_client.get_embedding(&triple.object).await?;
+            let subject_embed = get_embedding(&triple.subject).await?;
+            let object_embed = get_embedding(&triple.object).await?;
 
             // 添加或更新节点
             let subj_idx = self.get_or_create_node(&triple.subject, subject_embed);
             let obj_idx = self.get_or_create_node(&triple.object, object_embed);
 
-            // TODO relation没有使用到,关系查询还有问题
             // 添加关系边
-            self.graph.add_edge(subj_idx, obj_idx, triple.confidence);
+            self.graph.add_edge(
+                subj_idx,
+                obj_idx,
+                KnowledgeEdge {
+                    relation: triple.relation,
+                    confidence: triple.confidence,
+                },
+            );
         }
 
         // Step 3: 更新特异性
@@ -91,17 +112,15 @@ impl KnowledgeGraph {
         &self,
         question: T,
         retriever: &HippoRAGRetriever,
-        openie: &OpenIEProcessor,
-        embed_client: &EmbeddingClient,
     ) -> Result<Vec<String>> {
         // Step 1: 问题解析
-        let entities = self.extract_query_entities(question, openie).await?;
+        let entities = self.extract_query_entities(question).await?;
         debug!("entities: {:?}", entities);
 
         // Step 2: 获取嵌入
         let mut query_nodes = Vec::new();
         for entity in entities {
-            let embed = embed_client.get_embedding(&entity).await?;
+            let embed = get_embedding(&entity).await?;
             if let Some(closest) = self.find_closest_node(&embed) {
                 query_nodes.push(closest.text.clone());
             }
@@ -118,13 +137,9 @@ impl KnowledgeGraph {
             .collect())
     }
 
-    async fn extract_query_entities<T: Into<String>>(
-        &self,
-        question: T,
-        openie: &OpenIEProcessor,
-    ) -> Result<Vec<String>> {
+    async fn extract_query_entities<T: Into<String>>(&self, question: T) -> Result<Vec<String>> {
         let prompt = format!("Extract key entities from: {}", question.into());
-        let triples = openie.extract_triples(&prompt).await?;
+        let triples = extract_triples(&prompt).await?;
         debug!("triples: {:?}", triples);
 
         Ok(triples
@@ -145,4 +160,19 @@ impl KnowledgeGraph {
             (dot_product * -1.0e6) as i32
         })
     }
+}
+pub async fn extract_triples<T: Into<String>>(text: T) -> Result<Vec<KnowledgeTriple>> {
+    let prompt = format!(
+        r#"
+        Analyze the following text and extract all factual relationships in JSON format.
+        Use strict schema: [{{"subject": "...", "relation": "...", "object": "...", "confidence": 0.0}}]
+        Text: {}
+        "#,
+        text.into()
+    );
+    Ok(serde_json::from_str(
+        get_chat_completion(&SYSTEM_PROMPT.to_string(), &prompt)
+            .await?
+            .as_str(),
+    )?)
 }

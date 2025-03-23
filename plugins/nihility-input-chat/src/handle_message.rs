@@ -4,10 +4,7 @@ use onebot_v11::event::message::Message;
 use tracing::info;
 
 pub(super) async fn handle_message(message: Message) {
-    info!("handle_message: {:?}", message);
-    sender(Inspiration::ChatApp(
-        serde_json::to_string_pretty(&message).unwrap(),
-    ))
-    .await
-    .unwrap();
+    let message_str = serde_json::to_string_pretty(&message).unwrap();
+    info!("handle_message: {}", message_str);
+    sender(Inspiration::ChatApp(message_str)).await.unwrap();
 }

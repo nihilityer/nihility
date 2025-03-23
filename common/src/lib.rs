@@ -1,8 +1,10 @@
-pub mod inspiration;
 pub mod idea;
+pub mod inspiration;
+pub mod model;
 
+use crate::idea::MemoryIdea;
 use crate::inspiration::Inspiration;
-use crate::idea::Idea;
+use crate::model::NihilityModel;
 use anyhow::Result;
 use lazy_static::lazy_static;
 use tokio::sync::broadcast::Receiver;
@@ -12,14 +14,15 @@ use uuid::Uuid;
 
 lazy_static! {
     static ref GLOBAL_SENDER: Mutex<Option<mpsc::Sender<Inspiration>>> = Mutex::new(None);
-    static ref CHAT_OUTPUT: Mutex<broadcast::Sender<Idea >> = {
+    static ref CHAT_OUTPUT: Mutex<broadcast::Sender<String>> = {
         let (tx, _) = broadcast::channel(10);
         Mutex::new(tx)
     };
-    static ref MEMORY_IDEA: Mutex<broadcast::Sender<Idea >> = {
+    static ref MEMORY_IDEA: Mutex<broadcast::Sender<MemoryIdea>> = {
         let (tx, _) = broadcast::channel(10);
         Mutex::new(tx)
     };
+    static ref MODEL: Mutex<Option<Box<dyn NihilityModel + Send + Sync>>> = Mutex::new(None);
     static ref THINK: Mutex<Option<String>> = Mutex::new(None);
 }
 
@@ -31,6 +34,10 @@ pub async fn set_think<T: Into<String>>(think: T) {
 /// 获取当前思考
 pub async fn get_think() -> Option<String> {
     THINK.lock().await.clone()
+}
+
+pub async fn set_model(model: Box<dyn NihilityModel + Send + Sync>) {
+    MODEL.lock().await.replace(model);
 }
 
 /// 这个方法必须在其他信息输入组件注册之前运行
@@ -60,19 +67,19 @@ pub async fn register_inspiration_plugin(mut receiver: Receiver<Inspiration>) ->
 }
 
 /// 注册聊天输出组件,所有注册的组件都会受到消息
-pub async fn register_chat_output_plugin() -> broadcast::Receiver<Idea> {
+pub async fn register_chat_output_plugin() -> broadcast::Receiver<String> {
     CHAT_OUTPUT.lock().await.subscribe()
 }
 
 /// 发送聊天输出
-pub async fn sender_chat_output(output: Idea) -> Result<usize> {
+pub async fn sender_chat_output(output: String) -> Result<usize> {
     Ok(CHAT_OUTPUT.lock().await.send(output)?)
 }
 
-pub async fn register_memory_idea_plugin() -> broadcast::Receiver<Idea> {
+pub async fn register_memory_idea_plugin() -> broadcast::Receiver<MemoryIdea> {
     MEMORY_IDEA.lock().await.subscribe()
 }
 
-pub async fn sender_memory_idea(idea: Idea) -> Result<usize> {
+pub async fn sender_memory_idea(idea: MemoryIdea) -> Result<usize> {
     Ok(MEMORY_IDEA.lock().await.send(idea)?)
 }

@@ -8,6 +8,12 @@ async fn main() {
     let config = NihilityConfig::init().unwrap();
     Log::init(&config.log).unwrap();
     let input_receiver = init_inspiration_sender(20).await;
+    #[cfg(feature = "api-model")]
+    {
+        use nihility_model_api::NihilityApiModel;
+        NihilityApiModel::init(&config.api_model).await.unwrap();
+    }
+
     #[cfg(feature = "chat-bot")]
     {
         use nihility_input_chat::NihilityChatInput;
@@ -16,9 +22,7 @@ async fn main() {
     #[cfg(feature = "simple-memory")]
     {
         use nihility_memory_simple::NihilitySimpleMemory;
-        NihilitySimpleMemory::init(&config.simple_memory)
-            .await
-            .unwrap();
+        NihilitySimpleMemory::init().await.unwrap();
     }
     run(input_receiver).await.unwrap();
 }

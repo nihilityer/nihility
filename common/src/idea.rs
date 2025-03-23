@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Idea {
     ChatApp(String),
-    Memory(ChatIdea),
+    Memory(MemoryIdea),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ChatIdea {
+pub enum MemoryIdea {
     Remember(String),
     Query(String),
 }

@@ -1,13 +1,15 @@
 [package]
-name = "nihility-common"
+name = "nihility-model-api"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tokio = { workspace = true }
+async-openai = { version = "0.28" }
+serde_json = { version = "1.0", default-features = false }
+
+nihility-common = { workspace = true }
+
 anyhow = { workspace = true }
 tracing = { workspace = true }
-uuid = { workspace = true }
 serde = { workspace = true }
-lazy_static = { workspace = true }
 async-trait = { workspace = true }
