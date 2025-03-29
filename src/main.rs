@@ -1,28 +1,29 @@
-use nihility::config::NihilityConfig;
 use nihility::log::Log;
 use nihility::run;
 use nihility_common::init_inspiration_sender;
+use nihility_config::NihilityConfigPlugin;
 
 #[tokio::main]
 async fn main() {
-    let config = NihilityConfig::init().unwrap();
-    Log::init(&config.log).unwrap();
+    NihilityConfigPlugin::init("config").await.unwrap();
+    Log::init().await.unwrap();
     let input_receiver = init_inspiration_sender(20).await;
+
     #[cfg(feature = "api-model")]
     {
         use nihility_model_api::NihilityApiModel;
-        NihilityApiModel::init(&config.api_model).await.unwrap();
+        tokio::spawn(NihilityApiModel::init());
     }
 
     #[cfg(feature = "chat-bot")]
     {
         use nihility_input_chat::NihilityChatInput;
-        NihilityChatInput::init(&config.chat_bot).await.unwrap();
+        tokio::spawn(NihilityChatInput::init());
     }
     #[cfg(feature = "simple-memory")]
     {
         use nihility_memory_simple::NihilitySimpleMemory;
-        NihilitySimpleMemory::init().await.unwrap();
+        tokio::spawn(NihilitySimpleMemory::init());
     }
     run(input_receiver).await.unwrap();
 }

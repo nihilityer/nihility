@@ -1,21 +1,22 @@
 use crate::retrieval::HippoRAGRetriever;
 use anyhow::Result;
 use nihility_common::model::{get_chat_completion, get_embedding};
-use petgraph::{graph::NodeIndex, stable_graph::StableDiGraph};
+use petgraph::{graph::NodeIndex, Directed};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use petgraph::prelude::StableGraph;
 use tracing::debug;
 
 static SYSTEM_PROMPT: &str = "You are a precise information extraction system. Extract relationships with confidence scores.";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnowledgeNode {
     pub text: String,
     pub embedding: Vec<f32>,
     pub specificity: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnowledgeEdge {
     pub relation: String,
     pub confidence: f32,
@@ -29,9 +30,9 @@ pub struct KnowledgeTriple {
     pub confidence: f32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct KnowledgeGraph {
-    pub graph: StableDiGraph<KnowledgeNode, KnowledgeEdge>,
+    pub graph: StableGraph<KnowledgeNode, KnowledgeEdge, Directed>,
     pub node_indices: HashMap<String, NodeIndex>,
 }
 
@@ -44,7 +45,7 @@ impl Default for KnowledgeGraph {
 impl KnowledgeGraph {
     pub fn new() -> Self {
         Self {
-            graph: StableDiGraph::new(),
+            graph: StableGraph::new(),
             node_indices: HashMap::new(),
         }
     }
@@ -161,6 +162,7 @@ impl KnowledgeGraph {
 pub async fn extract_triples<T: Into<String>>(text: T) -> Result<Vec<KnowledgeTriple>> {
     let prompt = format!(
         r#"
+        
         Analyze the following text and extract all factual relationships in JSON format.
         Use strict schema: [{{"subject": "...", "relation": "...", "object": "...", "confidence": 0.0}}]
         Text: {}

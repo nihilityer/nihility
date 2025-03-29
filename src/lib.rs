@@ -1,13 +1,10 @@
-pub mod config;
 pub mod log;
 
-use anyhow::{Result, anyhow};
-use nihility_common::idea::MemoryIdea;
+use anyhow::Result;
 use nihility_common::inspiration::Inspiration;
 use nihility_common::model::get_chat_completion;
-use nihility_common::{get_think, sender_memory_idea};
 use tokio::sync::mpsc::Receiver;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 static EXTRACT_INFORMATION_PROMPT: &str = r#"
 你的任务是将从聊天机器人输入的JSON数据中提取关键信息，并结合当前讨论话题进行语义消歧和详细描述;
@@ -20,6 +17,19 @@ static EXTRACT_INFORMATION_PROMPT: &str = r#"
 特别说明：你只能输出符合JSON格式的响应，且必须包含'text'字段。
 Output Example:
 {"text":"example text"}
+"#;
+
+static UPDATE_THINK: &str = r#"
+你将作为一个助手的思考模块;
+根据用户输入更新当前思考内容;
+当前思考内容与输入有比较大区别时,判断一下哪个更值得进一步思考,并且更新思考内容;
+更新后的思考内容以JSON格式返回,返回示例:{"text":"example text"}
+例如:
+当前思考:当前群聊中正在讨论关于下一顿吃什么的问题.
+用户输入:有人在群聊中提问,怎么提高AI提示词的效果.
+正确处理:更新当前思考内容,思考如何帮助群友达到想要达到的目标.
+
+当前思考内容为:
 "#;
 
 static NEED_REMEMBER_PROMPT: &str = r#"
@@ -39,35 +49,54 @@ pub async fn run(mut input_receiver: Receiver<Inspiration>) -> Result<()> {
         match entity {
             Inspiration::ChatApp(chat_inspiration) => {
                 let system_prompt = format!(
-                    "{}\nCurrent Think:\'{}\'\nOther Additional Information:",
+                    "{}\nOther Additional Information:",
                     EXTRACT_INFORMATION_PROMPT,
-                    get_think().await.or_else(|| Some(String::new())).unwrap()
                 );
                 let precis = match get_chat_completion(system_prompt, chat_inspiration)
                     .await?
                     .get("text")
                 {
-                    None => return Err(anyhow!("Model Output Error")),
+                    None => {
+                        error!("Model Output Error");
+                        continue;
+                    }
                     Some(text) => text.to_string(),
                 };
                 info!("{}", precis);
+
+                let update_system_prompt = format!("{}\n", UPDATE_THINK);
+                match get_chat_completion(update_system_prompt, precis.to_string())
+                    .await?
+                    .get("text")
+                {
+                    None => {
+                        error!("Model Output Error");
+                        continue;
+                    }
+                    Some(think) => {
+                        info!("Update think: {}", think);
+                    }
+                }
+
                 let need_remember =
                     match get_chat_completion(NEED_REMEMBER_PROMPT.to_owned(), precis.clone())
                         .await?
                         .get("flag")
                     {
-                        None => return Err(anyhow!("Model Output Error")),
+                        None => {
+                            error!("Model Output Error");
+                            continue;
+                        }
                         Some(flag_value) => match flag_value.as_bool() {
-                            None => return Err(anyhow!("Model Output Error")),
+                            None => {
+                                error!("Model Output Error");
+                                continue;
+                            }
                             Some(flag) => flag,
                         },
                     };
                 info!("Need Remember: {}", need_remember);
-                if need_remember {
-                    sender_memory_idea(MemoryIdea::Remember(precis)).await?;
-                } else {
-                    sender_memory_idea(MemoryIdea::Query(precis)).await?;
-                }
+                // TODO
             }
             Inspiration::Memory(memory_inspiration) => {
                 warn!("Received inspiration: {:?}", memory_inspiration);

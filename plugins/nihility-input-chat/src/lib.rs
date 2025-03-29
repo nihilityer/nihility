@@ -11,8 +11,9 @@ use crate::handle_notice::handle_notice;
 use crate::handle_request::handle_request;
 use anyhow::Result;
 use lazy_static::lazy_static;
+use nihility_common::config::{NihilityConfigType, get_config};
 use nihility_common::inspiration::Inspiration;
-use nihility_common::{register_chat_output_plugin, register_inspiration_plugin};
+use nihility_common::{register_idea_receiver_plugin, register_inspiration_plugin};
 use onebot_v11::Event;
 pub use onebot_v11::connect::ws::WsConfig;
 use onebot_v11::connect::ws::WsConnect;
@@ -20,7 +21,6 @@ use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::{Mutex, broadcast};
 use tracing::{info, warn};
-use uuid::Uuid;
 
 lazy_static! {
     static ref CORE: Mutex<Option<NihilityChatInput>> = Mutex::new(None);
@@ -28,24 +28,24 @@ lazy_static! {
 
 #[derive(Clone)]
 pub struct NihilityChatInput {
-    pub id: Option<Uuid>,
     pub bot_sender: Sender<Inspiration>,
     pub ws_connect: Arc<WsConnect>,
 }
 
 impl NihilityChatInput {
-    pub async fn init(ws_config: &WsConfig) -> Result<()> {
+    pub async fn init() -> Result<()> {
         info!("Initializing Nihility Chat Input");
-        let connect = WsConnect::new(ws_config.clone()).await?;
+        let config =
+            get_config::<WsConfig>(env!("CARGO_PKG_NAME").to_string(), NihilityConfigType::Base)
+                .await?;
+        let connect = WsConnect::new(config).await?;
         let (tx, _) = broadcast::channel(10);
         let mut receiver = connect.subscribe().await;
-        let mut core = Self {
-            id: None,
+        let core = Self {
             bot_sender: tx,
             ws_connect: connect,
         };
-        core.id
-            .replace(register_inspiration_plugin(core.bot_sender.subscribe()).await?);
+        register_inspiration_plugin(core.bot_sender.subscribe()).await?;
         CORE.lock().await.replace(core);
 
         tokio::spawn(async move {
@@ -63,7 +63,7 @@ impl NihilityChatInput {
         });
 
         tokio::spawn(async move {
-            let mut output_receiver = register_chat_output_plugin().await;
+            let mut output_receiver = register_idea_receiver_plugin().await;
             while let Ok(output_entity) = output_receiver.recv().await {
                 warn!("Received chat should output {:?}", output_entity);
             }

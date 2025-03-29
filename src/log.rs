@@ -1,6 +1,7 @@
-use std::sync::OnceLock;
 use anyhow::Result;
+use nihility_common::config::{NihilityConfigType, get_config};
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use time::format_description::well_known::Iso8601;
 use tracing::debug;
 use tracing::level_filters::LevelFilter;
@@ -9,16 +10,16 @@ use tracing_appender::{non_blocking, rolling};
 use tracing_subscriber::fmt::time::LocalTime;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{fmt, Layer};
+use tracing_subscriber::{Layer, fmt};
 
-#[derive(Deserialize, Serialize, Default, Debug)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub enum LogOutType {
     #[default]
     Console,
     File(String),
 }
 
-#[derive(Deserialize, Serialize, Default, Debug)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum LogLevel {
     Trace,
@@ -29,8 +30,13 @@ pub enum LogLevel {
     Error,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogConfig {
+    pub log: Vec<LogConfigChunk>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct LogConfigChunk {
     pub enable: bool,
     pub out_type: LogOutType,
     pub level: LogLevel,
@@ -40,6 +46,14 @@ pub struct LogConfig {
     pub with_target: bool,
 }
 
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self {
+            log: vec![LogConfigChunk::default()],
+        }
+    }
+}
+
 pub struct Log;
 
 static CONSOLE_WORK_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
@@ -47,9 +61,9 @@ static FILE_WORK_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
 
 const LOG_FILE_NAME: &str = ".log";
 
-impl Default for LogConfig {
+impl Default for LogConfigChunk {
     fn default() -> Self {
-        LogConfig {
+        LogConfigChunk {
             enable: true,
             out_type: LogOutType::default(),
             level: LogLevel::default(),
@@ -62,7 +76,11 @@ impl Default for LogConfig {
 }
 
 impl Log {
-    pub fn init(configs: &Vec<LogConfig>) -> Result<()> {
+    pub async fn init() -> Result<()> {
+        let configs =
+            get_config::<LogConfig>(env!("CARGO_PKG_NAME").to_string(), NihilityConfigType::Base)
+                .await?
+                .log;
         let mut layers = Vec::new();
 
         for config in configs {
@@ -97,7 +115,7 @@ impl Log {
                 LogLevel::Warn => layer.with_filter(LevelFilter::WARN),
                 LogLevel::Error => layer.with_filter(LevelFilter::ERROR),
             }
-                .boxed();
+            .boxed();
             layers.push(layer);
         }
         tracing_subscriber::registry().with(layers).init();

@@ -4,5 +4,5 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Inspiration {
     ChatApp(String),
-    Memory(Vec<String>),
+    Memory(String),
 }

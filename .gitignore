@@ -22,6 +22,5 @@ Cargo.lock
 .idea/
 .vscode/
 
-config.json
-config.yaml
-config.toml
+config/
+*.json

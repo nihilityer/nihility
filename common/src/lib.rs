@@ -1,8 +1,10 @@
+pub mod config;
 pub mod idea;
 pub mod inspiration;
 pub mod model;
 
-use crate::idea::MemoryIdea;
+use crate::config::NihilityConfig;
+use crate::idea::Idea;
 use crate::inspiration::Inspiration;
 use crate::model::NihilityModel;
 use anyhow::Result;
@@ -10,30 +12,15 @@ use lazy_static::lazy_static;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::{Mutex, broadcast, mpsc};
 use tracing::error;
-use uuid::Uuid;
 
 lazy_static! {
-    static ref GLOBAL_SENDER: Mutex<Option<mpsc::Sender<Inspiration>>> = Mutex::new(None);
-    static ref CHAT_OUTPUT: Mutex<broadcast::Sender<String>> = {
-        let (tx, _) = broadcast::channel(10);
-        Mutex::new(tx)
-    };
-    static ref MEMORY_IDEA: Mutex<broadcast::Sender<MemoryIdea>> = {
+    static ref INSPIRATION_SENDER: Mutex<Option<mpsc::Sender<Inspiration>>> = Mutex::new(None);
+    static ref IDEA_SENDER: Mutex<broadcast::Sender<Idea>> = {
         let (tx, _) = broadcast::channel(10);
         Mutex::new(tx)
     };
     static ref MODEL: Mutex<Option<Box<dyn NihilityModel + Send + Sync>>> = Mutex::new(None);
-    static ref THINK: Mutex<Option<String>> = Mutex::new(None);
-}
-
-/// 设置当前思考
-pub async fn set_think<T: Into<String>>(think: T) {
-    THINK.lock().await.replace(think.into());
-}
-
-/// 获取当前思考
-pub async fn get_think() -> Option<String> {
-    THINK.lock().await.clone()
+    static ref CONFIG: Mutex<Option<Box<dyn NihilityConfig + Send + Sync>>> = Mutex::new(None);
 }
 
 pub async fn set_model(model: Box<dyn NihilityModel + Send + Sync>) {
@@ -43,43 +30,31 @@ pub async fn set_model(model: Box<dyn NihilityModel + Send + Sync>) {
 /// 这个方法必须在其他信息输入组件注册之前运行
 pub async fn init_inspiration_sender(buffer: usize) -> mpsc::Receiver<Inspiration> {
     let (tx, rx) = mpsc::channel(buffer);
-    *GLOBAL_SENDER.lock().await = Some(tx);
+    *INSPIRATION_SENDER.lock().await = Some(tx);
     rx
 }
 
-/// 注册一个信息输入组件
-pub async fn register_inspiration_plugin(mut receiver: Receiver<Inspiration>) -> Result<Uuid> {
-    match GLOBAL_SENDER.lock().await.clone() {
-        None => Err(anyhow::anyhow!("Global sender not initialized")),
+/// 注册一个灵感输入组件
+pub async fn register_inspiration_plugin(mut receiver: Receiver<Inspiration>) -> Result<()> {
+    match INSPIRATION_SENDER.lock().await.clone() {
+        None => Err(anyhow::anyhow!("Inspiration sender not initialized")),
         Some(sender) => {
-            let uuid = Uuid::new_v4();
-            let plugin_name = uuid;
             tokio::spawn(async move {
                 while let Ok(input) = receiver.recv().await {
                     if let Err(e) = sender.send(input).await {
-                        error!("{} Error sending input: {:?}", plugin_name, e);
+                        error!("Send inspiration to core error: {:?}", e);
                     }
                 }
             });
-            Ok(uuid)
+            Ok(())
         }
     }
 }
 
-/// 注册聊天输出组件,所有注册的组件都会受到消息
-pub async fn register_chat_output_plugin() -> broadcast::Receiver<String> {
-    CHAT_OUTPUT.lock().await.subscribe()
+pub async fn register_idea_receiver_plugin() -> broadcast::Receiver<Idea> {
+    IDEA_SENDER.lock().await.subscribe()
 }
 
-/// 发送聊天输出
-pub async fn sender_chat_output(output: String) -> Result<usize> {
-    Ok(CHAT_OUTPUT.lock().await.send(output)?)
-}
-
-pub async fn register_memory_idea_plugin() -> broadcast::Receiver<MemoryIdea> {
-    MEMORY_IDEA.lock().await.subscribe()
-}
-
-pub async fn sender_memory_idea(idea: MemoryIdea) -> Result<usize> {
-    Ok(MEMORY_IDEA.lock().await.send(idea)?)
+pub async fn sender_idea(idea: Idea) -> Result<usize> {
+    Ok(IDEA_SENDER.lock().await.send(idea)?)
 }
