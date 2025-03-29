@@ -4,7 +4,7 @@ mod retrieval;
 use anyhow::Result;
 use graph::KnowledgeGraph;
 use lazy_static::lazy_static;
-use nihility_common::config::{NihilityConfigType, get_config};
+use nihility_common::config::get_config;
 use nihility_common::idea::Idea;
 use nihility_common::inspiration::Inspiration;
 use nihility_common::model::get_chat_completion;
@@ -50,11 +50,8 @@ impl Default for NihilitySimpleMemoryConfig {
 impl NihilitySimpleMemory {
     pub async fn init() -> Result<()> {
         info!("Initializing NihilitySimpleMemory");
-        let config = get_config::<NihilitySimpleMemoryConfig>(
-            env!("CARGO_PKG_NAME").to_string(),
-            NihilityConfigType::Base,
-        )
-        .await?;
+        let config =
+            get_config::<NihilitySimpleMemoryConfig>(env!("CARGO_PKG_NAME").to_string()).await?;
         let file_path = Path::new(config.store_path.as_str());
 
         let graph = if file_path.exists() {

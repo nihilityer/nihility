@@ -9,7 +9,7 @@ use async_openai::types::{
     CreateEmbeddingRequestArgs, ResponseFormat,
 };
 use async_trait::async_trait;
-use nihility_common::config::{NihilityConfigType, get_config};
+use nihility_common::config::get_config;
 use nihility_common::model::NihilityModel;
 use nihility_common::set_model;
 use serde::de::Error;
@@ -46,11 +46,8 @@ pub struct NihilityApiModel {
 
 impl NihilityApiModel {
     pub async fn init() -> Result<()> {
-        let config = get_config::<NihilityApiModelConfig>(
-            env!("CARGO_PKG_NAME").to_string(),
-            NihilityConfigType::Base,
-        )
-        .await?;
+        let config =
+            get_config::<NihilityApiModelConfig>(env!("CARGO_PKG_NAME").to_string()).await?;
         let openai_config = OpenAIConfig::new()
             .with_api_base(&config.api_base_url)
             .with_api_key(&config.api_key);

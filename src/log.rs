@@ -1,5 +1,5 @@
 use anyhow::Result;
-use nihility_common::config::{NihilityConfigType, get_config};
+use nihility_common::config::get_config;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 use time::format_description::well_known::Iso8601;
@@ -77,10 +77,9 @@ impl Default for LogConfigChunk {
 
 impl Log {
     pub async fn init() -> Result<()> {
-        let configs =
-            get_config::<LogConfig>(env!("CARGO_PKG_NAME").to_string(), NihilityConfigType::Base)
-                .await?
-                .log;
+        let configs = get_config::<LogConfig>(env!("CARGO_PKG_NAME").to_string())
+            .await?
+            .log;
         let mut layers = Vec::new();
 
         for config in configs {

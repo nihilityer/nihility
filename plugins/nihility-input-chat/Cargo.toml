@@ -14,5 +14,5 @@ nihility-common = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
-uuid = { workspace = true }
 lazy_static = { workspace = true }
+serde = { version = "1.0.219", features = ["derive"] }

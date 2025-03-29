@@ -11,12 +11,13 @@ use crate::handle_notice::handle_notice;
 use crate::handle_request::handle_request;
 use anyhow::Result;
 use lazy_static::lazy_static;
-use nihility_common::config::{NihilityConfigType, get_config};
+use nihility_common::config::get_config;
 use nihility_common::inspiration::Inspiration;
 use nihility_common::{register_idea_receiver_plugin, register_inspiration_plugin};
 use onebot_v11::Event;
 pub use onebot_v11::connect::ws::WsConfig;
 use onebot_v11::connect::ws::WsConnect;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::{Mutex, broadcast};
@@ -35,9 +36,7 @@ pub struct NihilityChatInput {
 impl NihilityChatInput {
     pub async fn init() -> Result<()> {
         info!("Initializing Nihility Chat Input");
-        let config =
-            get_config::<WsConfig>(env!("CARGO_PKG_NAME").to_string(), NihilityConfigType::Base)
-                .await?;
+        let config = get_config::<WsConfig>(env!("CARGO_PKG_NAME").to_string()).await?;
         let connect = WsConnect::new(config).await?;
         let (tx, _) = broadcast::channel(10);
         let mut receiver = connect.subscribe().await;
