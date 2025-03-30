@@ -54,7 +54,7 @@ impl Default for LogConfig {
     }
 }
 
-pub struct Log;
+pub struct NihilityerLogPlugin;
 
 static CONSOLE_WORK_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
 static FILE_WORK_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
@@ -75,7 +75,7 @@ impl Default for LogConfigChunk {
     }
 }
 
-impl Log {
+impl NihilityerLogPlugin {
     pub async fn init() -> Result<()> {
         let configs = get_config::<LogConfig>(env!("CARGO_PKG_NAME").to_string())
             .await?
@@ -114,7 +114,7 @@ impl Log {
                 LogLevel::Warn => layer.with_filter(LevelFilter::WARN),
                 LogLevel::Error => layer.with_filter(LevelFilter::ERROR),
             }
-            .boxed();
+                .boxed();
             layers.push(layer);
         }
         tracing_subscriber::registry().with(layers).init();

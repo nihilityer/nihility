@@ -1,10 +1,9 @@
-pub mod log;
-
 use anyhow::Result;
 use nihility_common::inspiration::Inspiration;
 use nihility_common::model::get_chat_completion;
 use tokio::sync::mpsc::Receiver;
 use tracing::{error, info, warn};
+use tracing::log::debug;
 
 static EXTRACT_INFORMATION_PROMPT: &str = r#"
 你的任务是将从聊天机器人输入的JSON数据中提取关键信息，并结合当前讨论话题进行语义消歧和详细描述;
@@ -45,7 +44,7 @@ Output Example:
 pub async fn run(mut input_receiver: Receiver<Inspiration>) -> Result<()> {
     info!("Starting core thread");
     while let Some(entity) = input_receiver.recv().await {
-        info!("{:?}", entity);
+        debug!("{:?}", entity);
         match entity {
             Inspiration::ChatApp(chat_inspiration) => {
                 let system_prompt = format!(

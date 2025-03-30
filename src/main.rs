@@ -1,12 +1,12 @@
-use nihility::log::Log;
 use nihility::run;
 use nihility_common::init_inspiration_sender;
 use nihility_config::NihilityConfigPlugin;
+use nihility_log::NihilityerLogPlugin;
 
 #[tokio::main]
 async fn main() {
     NihilityConfigPlugin::init("config").await.unwrap();
-    Log::init().await.unwrap();
+    NihilityerLogPlugin::init().await.unwrap();
     let input_receiver = init_inspiration_sender(20).await;
 
     #[cfg(feature = "api-model")]

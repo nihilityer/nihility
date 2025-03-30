@@ -109,15 +109,14 @@ impl NihilityModel for NihilityApiModel {
                 name: None,
             }),
             ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-                content: user.into(),
-                name: None,
-            }),
-            ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-                content: Array(vec![ChatCompletionRequestUserMessageContentPart::ImageUrl(
-                    ChatCompletionRequestMessageContentPartImage {
-                        image_url: image.into(),
-                    },
-                )]),
+                content: Array(vec![
+                    ChatCompletionRequestUserMessageContentPart::Text(user.into()),
+                    ChatCompletionRequestUserMessageContentPart::ImageUrl(
+                        ChatCompletionRequestMessageContentPartImage {
+                            image_url: image.into(),
+                        },
+                    ),
+                ]),
                 name: None,
             }),
         ];

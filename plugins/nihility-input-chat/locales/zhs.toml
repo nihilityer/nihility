@@ -1,0 +1,19 @@
+_version = 1
+
+[prompt]
+analyze_image_system = '''
+你将作为一个助手系统的图片识别模块,结合当前思考内容将获取的图片详细地解析并描述图片的内容;
+描述内容尽可能简洁精准;
+当前思考内容将由用户提供;
+
+特别说明：你只能输出符合JSON格式的响应，且必须包含'text'字段。
+Output Example:
+{"text":"example text"}
+'''
+analyze_image_user = '''
+请简洁完整地描述这张图片
+'''
+message_image_chunk = '''
+
+以下是消息中各图片的解析(如果有),url表示图片原本的链接或数据,text表示图片的解析内容:
+'''

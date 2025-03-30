@@ -13,3 +13,9 @@ tracing = { workspace = true }
 serde = { workspace = true }
 async-trait = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+nihility-config = { path = "../nihility-config", version = "0.1.0" }
+nihility-log = { path = "../nihility-log", version = "0.1.0" }
+
+tokio = { workspace = true, features = ["macros"] }

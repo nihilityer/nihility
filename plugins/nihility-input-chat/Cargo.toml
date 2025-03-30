@@ -8,6 +8,7 @@ onebot_v11 = { version = "0.1", default-features = false }
 serde_json = { version = "1.0", default-features = false }
 reqwest = { version = "0.12", features = ["json"] }
 base64 = { version = "0.22" }
+image = { version = "0.25" }
 
 nihility-common = { workspace = true }
 
@@ -15,4 +16,5 @@ tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 lazy_static = { workspace = true }
-serde = { version = "1.0.219", features = ["derive"] }
+serde = { workspace = true }
+rust-i18n = { workspace = true }

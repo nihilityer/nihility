@@ -11,17 +11,20 @@ use crate::handle_notice::handle_notice;
 use crate::handle_request::handle_request;
 use anyhow::Result;
 use lazy_static::lazy_static;
-use nihility_common::config::get_config;
+use nihility_common::config::{get_config, get_global_config};
 use nihility_common::inspiration::Inspiration;
 use nihility_common::{register_idea_receiver_plugin, register_inspiration_plugin};
 use onebot_v11::Event;
 pub use onebot_v11::connect::ws::WsConfig;
 use onebot_v11::connect::ws::WsConnect;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use rust_i18n::{i18n, set_locale};
+use serde_json::Value;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::{Mutex, broadcast};
 use tracing::{info, warn};
+
+i18n!("locales", fallback = "zhs");
 
 lazy_static! {
     static ref CORE: Mutex<Option<NihilityChatInput>> = Mutex::new(None);
@@ -37,6 +40,8 @@ impl NihilityChatInput {
     pub async fn init() -> Result<()> {
         info!("Initializing Nihility Chat Input");
         let config = get_config::<WsConfig>(env!("CARGO_PKG_NAME").to_string()).await?;
+        let local = get_global_config("local", Value::from("zhs")).await?;
+        set_locale(local.as_str().unwrap_or("zhs"));
         let connect = WsConnect::new(config).await?;
         let (tx, _) = broadcast::channel(10);
         let mut receiver = connect.subscribe().await;
