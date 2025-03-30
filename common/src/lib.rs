@@ -1,10 +1,10 @@
 pub mod config;
-pub mod idea;
+pub mod intention;
 pub mod inspiration;
 pub mod model;
 
 use crate::config::NihilityConfig;
-use crate::idea::Idea;
+use crate::intention::Intention;
 use crate::inspiration::Inspiration;
 use crate::model::NihilityModel;
 use anyhow::Result;
@@ -15,7 +15,7 @@ use tracing::error;
 
 lazy_static! {
     static ref INSPIRATION_SENDER: Mutex<Option<mpsc::Sender<Inspiration>>> = Mutex::new(None);
-    static ref IDEA_SENDER: Mutex<broadcast::Sender<Idea>> = {
+    static ref INTENTION_SENDER: Mutex<broadcast::Sender<Intention >> = {
         let (tx, _) = broadcast::channel(10);
         Mutex::new(tx)
     };
@@ -51,10 +51,10 @@ pub async fn register_inspiration_plugin(mut receiver: Receiver<Inspiration>) ->
     }
 }
 
-pub async fn register_idea_receiver_plugin() -> broadcast::Receiver<Idea> {
-    IDEA_SENDER.lock().await.subscribe()
+pub async fn register_intention_receiver_plugin() -> broadcast::Receiver<Intention> {
+    INTENTION_SENDER.lock().await.subscribe()
 }
 
-pub async fn sender_idea(idea: Idea) -> Result<usize> {
-    Ok(IDEA_SENDER.lock().await.send(idea)?)
+pub async fn sender_intention(intention: Intention) -> Result<usize> {
+    Ok(INTENTION_SENDER.lock().await.send(intention)?)
 }

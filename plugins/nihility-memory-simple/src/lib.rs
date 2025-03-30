@@ -5,10 +5,10 @@ use anyhow::Result;
 use graph::KnowledgeGraph;
 use lazy_static::lazy_static;
 use nihility_common::config::get_config;
-use nihility_common::idea::Idea;
+use nihility_common::intention::{DecisionType};
 use nihility_common::inspiration::Inspiration;
 use nihility_common::model::get_chat_completion;
-use nihility_common::{register_idea_receiver_plugin, register_inspiration_plugin};
+use nihility_common::{register_intention_receiver_plugin, register_inspiration_plugin};
 use retrieval::HippoRAGRetriever;
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
@@ -16,7 +16,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use tokio::sync::broadcast::Sender;
 use tokio::sync::{Mutex, broadcast, mpsc};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 lazy_static! {
     static ref CORE: Mutex<Option<NihilitySimpleMemory>> = Mutex::new(None);
@@ -69,7 +69,7 @@ impl NihilitySimpleMemory {
         let retriever = HippoRAGRetriever::new(0.85);
 
         let (tx, _) = broadcast::channel(10);
-        let (core_rx, mut core_tx) = mpsc::channel::<String>(10);
+        let (_core_rx, mut core_tx) = mpsc::channel::<String>(10);
         let core = Self {
             config: config.clone(),
             graph,
@@ -87,12 +87,10 @@ impl NihilitySimpleMemory {
         });
 
         tokio::spawn(async move {
-            let mut idea_receiver = register_idea_receiver_plugin().await;
-            while let Ok(idea) = idea_receiver.recv().await {
-                if let Idea::Memory(memory_idea) = idea {
-                    if let Err(e) = core_rx.send(memory_idea).await {
-                        error!("Failed to send memory query: {:?}", e);
-                    }
+            let mut idea_receiver = register_intention_receiver_plugin().await;
+            while let Ok(intention) = idea_receiver.recv().await {
+                if intention.decision == DecisionType::Recall || intention.decision == DecisionType::Memorize { 
+                    info!("receiver intention: {:?}", intention);
                 }
             }
         });

@@ -11,9 +11,8 @@ api-model = ["nihility-model-api"]
 
 [dependencies]
 nihility-common = { workspace = true }
-
-nihility-config = { path = "plugins/nihility-config", version = "0.1.0" }
-nihility-log = { path = "plugins/nihility-log", version = "0.1.0" }
+nihility-config = { workspace = true }
+nihility-log = { workspace = true }
 
 nihility-input-chat = { path = "plugins/nihility-input-chat", version = "0.1.0", optional = true }
 nihility-memory-simple = { path = "plugins/nihility-memory-simple", version = "0.1.0", optional = true }
@@ -22,9 +21,14 @@ nihility-model-api = { path = "plugins/nihility-model-api", version = "0.1.0", o
 tokio = { workspace = true, features = ["macros"] }
 anyhow = { workspace = true }
 tracing = { workspace = true }
+rust-i18n = { workspace = true }
+serde_json = { workspace = true }
+lazy_static = { workspace = true }
 
 [workspace.dependencies]
 nihility-common = { path = "common", version = "0.1.0" }
+nihility-config = { path = "plugins/nihility-config", version = "0.1.0" }
+nihility-log = { path = "plugins/nihility-log", version = "0.1.0" }
 
 tokio = { version = "1.44", default-features = false, features = ["sync", "rt", "rt-multi-thread", "tracing"] }
 anyhow = { version = "1", default-features = false }

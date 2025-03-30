@@ -10,7 +10,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use image::{guess_format, ImageFormat};
 use tracing::log::debug;
-use tracing::{error, info};
+use tracing::{error};
 
 
 pub(super) async fn handle_message(message: Message) {
@@ -69,8 +69,8 @@ pub(super) async fn handle_message(message: Message) {
     let message_str = serde_json::to_string_pretty(&message)
         .unwrap()
         .add(image_analyze.as_str());
-    info!("handle_message: {}", message_str);
-    sender(Inspiration::ChatApp(message_str)).await.unwrap();
+    debug!("handle_message: {}", message_str);
+    sender(Inspiration::External(message_str)).await.unwrap();
 }
 
 async fn get_image_base64(url: &String) -> Result<String> {

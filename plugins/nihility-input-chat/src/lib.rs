@@ -13,7 +13,7 @@ use anyhow::Result;
 use lazy_static::lazy_static;
 use nihility_common::config::{get_config, get_global_config};
 use nihility_common::inspiration::Inspiration;
-use nihility_common::{register_idea_receiver_plugin, register_inspiration_plugin};
+use nihility_common::{register_intention_receiver_plugin, register_inspiration_plugin};
 use onebot_v11::Event;
 pub use onebot_v11::connect::ws::WsConfig;
 use onebot_v11::connect::ws::WsConnect;
@@ -67,7 +67,7 @@ impl NihilityChatInput {
         });
 
         tokio::spawn(async move {
-            let mut output_receiver = register_idea_receiver_plugin().await;
+            let mut output_receiver = register_intention_receiver_plugin().await;
             while let Ok(output_entity) = output_receiver.recv().await {
                 warn!("Received chat should output {:?}", output_entity);
             }
