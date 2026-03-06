@@ -1,7 +1,8 @@
-use axum::body::Body;
+use crate::error::*;
 use axum::Router;
+use axum::body::Body;
+use axum::http::Response;
 use axum::http::header::CONTENT_TYPE;
-use axum::http::{Response, StatusCode};
 use axum::routing::get;
 use mime_guess::from_path;
 use rust_embed::Embed;
@@ -11,10 +12,10 @@ use rust_embed::Embed;
 struct Assets;
 
 pub(crate) fn app_router() -> Router {
-    Router::new().fallback(get(get(static_handler)))
+    Router::new().fallback(get(static_handler))
 }
 
-async fn static_handler(uri: axum::http::Uri) -> Result<Response<Body>, StatusCode> {
+async fn static_handler(uri: axum::http::Uri) -> Result<Response<Body>> {
     let path = uri.path().trim_start_matches('/');
     let path = if path.is_empty() || Assets::get(path).is_none() {
         "index.html"
@@ -30,6 +31,6 @@ async fn static_handler(uri: axum::http::Uri) -> Result<Response<Body>, StatusCo
                 .body(Body::from(content.data.into_owned()))
                 .unwrap())
         }
-        None => Err(StatusCode::NOT_FOUND),
+        None => Err(NihilityServerError::NotFound(path.into())),
     }
 }
