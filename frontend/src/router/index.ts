@@ -32,6 +32,26 @@ const router = createRouter({
 // 路由守卫 - 检查 token
 router.beforeEach((to, _from) => {
   const authStore = useAuthStore()
+
+  // 检查 URL 中是否带有 token 参数
+  const tokenParam = to.query.token as string | undefined
+  if (tokenParam) {
+    // 保存 token 到本地缓存
+    authStore.setToken(tokenParam)
+
+    // 从 URL 中移除 token 参数（安全考虑）
+    const query = { ...to.query }
+    delete query.token
+
+    // 重定向到相同路径但移除 token 参数
+    return {
+      path: to.path,
+      query,
+      hash: to.hash,
+      replace: true, // 替换历史记录，避免后退时重新处理 token
+    }
+  }
+
   const hasToken = authStore.hasToken()
 
   // 只检查需要认证的页面，未配置 token 时跳转到配置页
