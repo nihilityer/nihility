@@ -1,0 +1,13 @@
+[package]
+name = "nihility-server-entity"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[dependencies]

@@ -1,0 +1,57 @@
+[package]
+name = "nihility"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[workspace]
+members = ["server", "crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["nihilityer <nihilityer@mail.nihilityer.top>"]
+readme = "README.md"
+keywords = ["nihility", "ContextEngineering", "assistant"]
+license = "MIT"
+repository = "https://github.com/nihilityer/nihility"
+homepage = "https://github.com/nihilityer/nihility"
+publish = false
+
+[workspace.dependencies]
+nihility-log = { path = "crates/log" }
+nihility-config = { path = "crates/config" }
+nihility-server = { path = "server" }
+nihility-server-entity = { path = "crates/server-entity" }
+nihility-server-migration = { path = "crates/server-migration" }
+
+axum = { version = "0.8" }
+tracing = { version = "0.1", default-features = false }
+tracing-subscriber = { version = "0.3", features = ["local-time", "ansi", "fmt", "std"] }
+tracing-appender = { version = "0.2" }
+time = { version = "0.3", default-features = false, features = ["parsing"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+toml = { version = "1.0", default-features = false, features = ["display", "parse", "serde"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
+tokio = { version = "1.49", features = ["macros", "rt-multi-thread"] }
+rust-embed = { version = "8.11" }
+mime_guess = { version = "2.0" }
+thiserror = { version = "2.0" }
+
+sea-orm = { version = "~2.0.0-rc.35", features = ["macros", "serde_json", "with-json", "with-uuid", "runtime-tokio-rustls"] }
+sea-orm-migration = { version = "~2.0.0-rc.35", features = ["runtime-tokio-rustls"] }
+
+[[bin]]
+name = "nihility-server"
+path = "src/server.rs"
+
+[dependencies]
+tokio = { workspace = true }
+nihility-log = { workspace = true }
+nihility-server = { workspace = true }

@@ -1,0 +1,16 @@
+[package]
+name = "nihility-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
+rust-embed = { workspace = true }
+mime_guess = { workspace = true }

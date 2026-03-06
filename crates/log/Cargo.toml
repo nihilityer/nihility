@@ -1,0 +1,22 @@
+[package]
+name = "nihility-log"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[dependencies]
+nihility-config = { workspace = true }
+
+tracing = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+time = { workspace = true }
