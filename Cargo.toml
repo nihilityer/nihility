@@ -44,14 +44,20 @@ rust-embed = { version = "8.11" }
 mime_guess = { version = "2.0" }
 thiserror = { version = "2.0" }
 
-sea-orm = { version = "~2.0.0-rc.35", features = ["macros", "serde_json", "with-json", "with-uuid", "runtime-tokio-rustls"] }
-sea-orm-migration = { version = "~2.0.0-rc.35", features = ["runtime-tokio-rustls"] }
+sea-orm = { version = "~2.0.0-rc.36", features = ["macros", "serde_json", "with-json", "with-uuid", "runtime-tokio-rustls"] }
+sea-orm-migration = { version = "~2.0.0-rc.36" }
 
 [[bin]]
 name = "nihility-server"
 path = "src/server.rs"
 
+[features]
+default = ["sqlite"]
+sqlite = ["nihility-server/sqlite"]
+postgres = ["nihility-server/postgres"]
+
 [dependencies]
 tokio = { workspace = true }
 nihility-log = { workspace = true }
+nihility-config = { workspace = true }
 nihility-server = { workspace = true }

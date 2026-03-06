@@ -9,10 +9,20 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[features]
+default = ["sqlite"]
+sqlite = ["sea-orm/sqlx-sqlite"]
+postgres = ["sea-orm/sqlx-postgres"]
+
 [dependencies]
 axum = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 rust-embed = { workspace = true }
 mime_guess = { workspace = true }
 thiserror = { workspace = true }
+sea-orm = { workspace = true }
+
+nihility-server-entity = { workspace = true }
+nihility-server-migration = { workspace = true }

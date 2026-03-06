@@ -62,3 +62,5 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 package-lock.json
+db.sqlite
+.env
