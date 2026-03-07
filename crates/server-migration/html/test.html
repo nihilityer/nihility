@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>设备仪表盘</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/npm/@fontsource/unifont@5.0.0/index.min.css');
+
+        body {
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Unifont', sans-serif;
+        }
+
+        /* Enforce strict Black & White */
+        .bw-only {
+            background-color: white !important;
+            color: black !important;
+            border-color: black !important;
+        }
+
+        .bw-only * {
+            border-color: black !important;
+            color: black !important;
+            fill: black !important;
+            stroke: black !important;
+        }
+
+        /* Custom Scrollbar for Webkit */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: white;
+            border-left: 1px solid black;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: black;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #333;
+        }
+
+        .message-item.selected * {
+            color: black !important;
+            fill: black !important;
+            stroke: black !important;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <!-- Device Container 400x300 -->
+    <div @keydown="handleKeydown"
+         class="bw-only w-[400px] h-[300px] flex flex-col border-4 border-black shadow-2xl relative overflow-hidden"
+         ref="deviceContainer" tabindex="0">
+
+        <!-- Top Bar: Status & Logo -->
+        <header class="h-10 border-b border-black flex items-center justify-between px-3 bg-white shrink-0">
+            <!-- Left: Logo (SVG Home) -->
+            <div class="w-1/3 flex justify-start font-bold">
+                Nihility
+            </div>
+
+            <!-- Right: Status Icons (Battery, Network, Work Status) -->
+            <div class="w-2/3 flex justify-end items-center gap-3">
+                <!-- Work Status -->
+                <div class="flex items-center gap-1" title="状态">
+                    <div class="w-2 h-2 bg-black rounded-full animate-pulse"></div>
+                    <span class="text-xs uppercase tracking-wider font-bold">运行中</span>
+                </div>
+
+                <!-- Network -->
+                <div class="flex items-center gap-1" title="网络">
+                    <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                         stroke-width="2" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                        <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                        <line x1="12" x2="12.01" y1="20" y2="20"/>
+                    </svg>
+                </div>
+
+                <!-- Battery -->
+                <div class="flex items-center gap-1" title="电池">
+                    <span class="text-xs font-bold">85%</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex overflow-hidden">
+
+            <!-- Left Panel: Time & Date (1/3 width) -->
+            <section
+                    class="w-1/3 border-r border-black flex flex-col justify-center items-center p-2 text-center bg-white shrink-0">
+                <div class="text-3xl font-bold leading-none mb-2">
+                    {{ currentTime }}
+                </div>
+                <div class="text-sm font-medium opacity-90">
+                    {{ currentDate }}
+                </div>
+            </section>
+
+            <!-- Right Panel: Message List (2/3 width) -->
+            <section class="w-2/3 flex flex-col bg-white relative">
+                <!-- Scrollable Container -->
+                <div class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2 h-full" ref="messageList">
+                    <div class="text-xs text-center py-4 animate-pulse font-bold" v-if="loading">
+                        加载中...
+                    </div>
+
+                    <div class="text-xs text-center py-4 opacity-70" v-else-if="messages.length === 0">
+                        暂无新消息
+                    </div>
+
+                    <div :class="['border border-black p-2 text-xs transition-colors cursor-default group message-item flex gap-2', selectedIndex === index ? 'selected' : 'hover:border-r-4 hover:border-r-black']"
+                         :key="msg.id"
+                         :ref="el => setMessageRef(el, index)"
+                         :style="selectedIndex === index ? 'border-top-width: 4px' : 'border-top-width: 1px'"
+                         @click="selectIndex(index)"
+                         v-for="(msg, index) in messages">
+                        <!-- Message Content -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between mb-1 font-bold">
+                                <span>{{ msg.title }}</span>
+                                <span class="opacity-80">{{ msg.time }}</span>
+                            </div>
+                            <div class="opacity-90 line-clamp-2">
+                                {{ msg.content }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script>
+    const {createApp, ref, onMounted, onUnmounted, nextTick, watch} = Vue;
+
+    createApp({
+        setup() {
+            const currentTime = ref('');
+            const currentDate = ref('');
+            const messages = ref([]);
+            const loading = ref(true);
+            const selectedIndex = ref(-1);
+            const messageRefs = ref([]);
+            const deviceContainer = ref(null);
+            const messageList = ref(null);
+
+            // Update Clock
+            const updateTime = () => {
+                const now = new Date();
+                currentTime.value = now.toLocaleTimeString('zh-CN', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                currentDate.value = now.toLocaleDateString('zh-CN', {month: 'short', day: 'numeric', weekday: 'short'});
+            };
+
+            // Set message ref for each item
+            const setMessageRef = (el, index) => {
+                if (el) {
+                    messageRefs.value[index] = el;
+                }
+            };
+
+            // Select index
+            const selectIndex = (index) => {
+                if (index >= 0 && index < messages.value.length) {
+                    selectedIndex.value = index;
+                    scrollToSelected();
+                }
+            };
+
+            // Scroll to selected item
+            const scrollToSelected = () => {
+                nextTick(() => {
+                    const selectedEl = messageRefs.value[selectedIndex.value];
+                    const listEl = messageList.value;
+
+                    if (selectedEl && listEl) {
+                        const itemTop = selectedEl.offsetTop;
+                        const itemHeight = selectedEl.offsetHeight;
+                        const listHeight = listEl.clientHeight;
+                        const scrollTop = listEl.scrollTop;
+
+                        // Check if item is above visible area
+                        if (itemTop < scrollTop) {
+                            listEl.scrollTo({
+                                top: itemTop,
+                                behavior: 'smooth'
+                            });
+                        }
+                        // Check if item is below visible area
+                        else if (itemTop + itemHeight > scrollTop + listHeight) {
+                            listEl.scrollTo({
+                                top: itemTop + itemHeight - listHeight,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+                });
+            };
+
+            // Handle keyboard navigation
+            const handleKeydown = (event) => {
+                if (messages.value.length === 0) return;
+
+                if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const newIndex = selectedIndex.value > 0 ? selectedIndex.value - 1 : messages.value.length - 1;
+                    selectIndex(newIndex);
+                } else if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    const newIndex = selectedIndex.value < messages.value.length - 1 ? selectedIndex.value + 1 : 0;
+                    selectIndex(newIndex);
+                }
+            };
+
+            // Watch for messages change to auto-select first item
+            watch(messages, (newMessages) => {
+                if (newMessages.length > 0 && selectedIndex.value === -1) {
+                    selectedIndex.value = 0;
+                    scrollToSelected();
+                }
+            });
+
+            // Fetch Messages
+            const fetchMessages = async () => {
+                const token = localStorage.getItem('nihility_auth_token');
+
+                if (!token) {
+                    // Mock Data Fallback
+                    console.log('No token found, using mock data.');
+                    setTimeout(() => {
+                        messages.value = [
+                            {id: 1, title: '系统警报', content: '固件更新可用 v2.4.0', time: '10:42'},
+                            {id: 2, title: '用户登录', content: '管理员从 192.168.1.5 登录', time: '09:15'},
+                            {id: 3, title: '传感器错误', content: '温度传感器 #4 读数超出范围', time: '昨天'},
+                            {id: 4, title: '备份完成', content: '每日备份成功完成', time: '昨天'},
+                            {
+                                id: 5,
+                                title: '安全警告',
+                                content: '检测到来自 IP 10.0.0.5 的登录失败尝试',
+                                time: '2 天前'
+                            },
+                            {id: 6, title: '维护通知', content: '计划维护窗口将于凌晨 02:00 开始', time: '3 天前'},
+                            {id: 7, title: '存储空间不足', content: '磁盘使用率超过 90% 阈值', time: '1 周前'},
+                            {id: 8, title: '更新成功', content: '模块 B 已成功更新至 v1.2', time: '1 周前'}
+                        ];
+                        loading.value = false;
+                    }, 500);
+                    return;
+                }
+
+                // Real API Call
+                try {
+                    const response = await fetch('/api/message', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) throw new Error('Network response was not ok');
+
+                    messages.value = await response.json();
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                    messages.value = [
+                        {
+                            id: 99,
+                            title: '连接错误',
+                            content: '获取消息失败',
+                            time: '现在'
+                        }
+                    ];
+                } finally {
+                    loading.value = false;
+                }
+            };
+
+            onMounted(() => {
+                updateTime();
+                setInterval(updateTime, 1000);
+                fetchMessages();
+
+                // Focus the container for keyboard events
+                if (deviceContainer.value) {
+                    deviceContainer.value.focus();
+                }
+            });
+
+            return {
+                currentTime,
+                currentDate,
+                messages,
+                loading,
+                selectedIndex,
+                deviceContainer,
+                messageList,
+                setMessageRef,
+                selectIndex,
+                handleKeydown
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
+

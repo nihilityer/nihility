@@ -1,4 +1,7 @@
+use nihility_server_entity::html_pages;
+use sea_orm_migration::sea_orm::{ActiveModelTrait, Set};
 use sea_orm_migration::{prelude::*, schema::*};
+use uuid::Uuid;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -20,7 +23,20 @@ impl MigrationTrait for Migration {
                     )
                     .to_owned(),
             )
-            .await
+            .await?;
+
+        let conn = manager.get_connection();
+
+        html_pages::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            path: Set("test".to_string()),
+            html: Set(include_str!("../html/test.html").to_string()),
+            update_at: Default::default(),
+        }
+        .insert(conn)
+        .await?;
+
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {

@@ -11,4 +11,7 @@ homepage.workspace = true
 publish.workspace = true
 
 [dependencies]
+uuid = { workspace = true }
 sea-orm-migration = { workspace = true }
+
+nihility-server-entity = { workspace = true }

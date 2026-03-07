@@ -35,6 +35,7 @@ axum = { version = "0.8" }
 tracing = { version = "0.1", default-features = false }
 tracing-subscriber = { version = "0.3", features = ["local-time", "ansi", "fmt", "std"] }
 tracing-appender = { version = "0.2" }
+uuid = { version = "1.22", default-features = false, features = ["v4"] }
 time = { version = "0.3", default-features = false, features = ["parsing"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 toml = { version = "1.0", default-features = false, features = ["display", "parse", "serde"] }
