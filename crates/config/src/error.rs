@@ -1,5 +1,5 @@
 #[derive(thiserror::Error, Debug)]
-pub enum NihilityConfigError {
+pub enum ConfigError {
     #[error("IO error: {0}")]
     IO(#[from] std::io::Error),
     #[cfg(feature = "json_config")]

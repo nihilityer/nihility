@@ -22,6 +22,7 @@ Cargo.lock
 config
 log
 data
+output
 
 # Logs
 logs

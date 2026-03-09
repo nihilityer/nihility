@@ -1,6 +1,6 @@
-pub use crate::error::NihilityConfigError;
-use serde::Serialize;
+pub use crate::error::ConfigError;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -13,7 +13,7 @@ const DEFAULT_BASE_PATH: &str = "./config";
 const TOML_SUFFIX: &str = "toml";
 const JSON_SUFFIX: &str = "json";
 
-pub fn get_config<T>(module_name: &str) -> Result<T, NihilityConfigError>
+pub fn get_config<T>(module_name: &str) -> Result<T, ConfigError>
 where
     T: Serialize + DeserializeOwned + Default,
 {
@@ -39,7 +39,7 @@ where
     Ok(T::default())
 }
 
-pub fn set_config<T>(module_name: &str, module_config: &T) -> Result<(), NihilityConfigError>
+pub fn set_config<T>(module_name: &str, module_config: &T) -> Result<(), ConfigError>
 where
     T: Serialize,
 {
@@ -50,13 +50,17 @@ where
     if Path::try_exists(format!("{}.{}", prefix, TOML_SUFFIX).as_ref())?
         && cfg!(feature = "toml_config")
     {
-        let mut config_file = File::options().write(true).open(format!("{}.{}", prefix, TOML_SUFFIX))?;
+        let mut config_file = File::options()
+            .write(true)
+            .open(format!("{}.{}", prefix, TOML_SUFFIX))?;
         config_file.write_all(toml::to_string_pretty(module_config)?.as_bytes())?;
         config_file.flush()?;
     } else if Path::try_exists(format!("{}.{}", prefix, JSON_SUFFIX).as_ref())?
         && cfg!(feature = "json_config")
     {
-        let mut config_file = File::options().write(true).open(format!("{}.{}", prefix, JSON_SUFFIX))?;
+        let mut config_file = File::options()
+            .write(true)
+            .open(format!("{}.{}", prefix, JSON_SUFFIX))?;
         config_file.write_all(serde_json::to_string_pretty(module_config)?.as_bytes())?;
         config_file.flush()?;
     } else {
@@ -68,7 +72,7 @@ where
     Ok(())
 }
 
-fn init_base_path<P: AsRef<Path>>(path: P) -> Result<(), NihilityConfigError> {
+fn init_base_path<P: AsRef<Path>>(path: P) -> Result<(), ConfigError> {
     if !Path::try_exists(path.as_ref())? {
         fs::create_dir_all(path)?;
     } else if path.as_ref().is_file() {
