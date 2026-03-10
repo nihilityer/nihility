@@ -3,15 +3,19 @@ mod router;
 mod service;
 
 use crate::error::*;
+use crate::router::JwtKeys;
+use nihility_secret::generate_secret;
+use nihility_server_migration::{Migrator, MigratorTrait};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
-use nihility_server_migration::{Migrator, MigratorTrait};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
     addr: String,
     port: u16,
+    jwt_secret: String,
+    jwt_expiration: usize,
     database: DatabaseConfig,
 }
 
@@ -28,6 +32,7 @@ pub struct DatabaseConfig {
 
 #[derive(Clone)]
 struct AppState {
+    jwt: JwtKeys,
     conn: DatabaseConnection,
 }
 
@@ -43,8 +48,10 @@ pub async fn start_server(config: ServerConfig) -> Result<()> {
     let conn = Database::connect(opt).await?;
     Migrator::up(&conn, None).await?;
 
-    let state = AppState { conn };
-    let app = router::app_router().with_state(state);
+    let jwt = JwtKeys::new(config.jwt_secret.as_bytes(), config.jwt_expiration);
+
+    let state = AppState { conn, jwt };
+    let app = router::app_router(state.clone()).with_state(state);
 
     let listener = tokio::net::TcpListener::bind((config.addr, config.port)).await?;
     axum::serve(listener, app).await?;
@@ -56,6 +63,8 @@ impl Default for ServerConfig {
         Self {
             addr: "127.0.0.1".to_string(),
             port: 8080,
+            jwt_secret: generate_secret(26),
+            jwt_expiration: 60 * 24 * 7,
             database: Default::default(),
         }
     }

@@ -29,15 +29,23 @@ nihility-config = { path = "crates/config" }
 nihility-log = { path = "crates/log" }
 nihility-module = { path = "crates/module" }
 nihility-module-browser-control = { path = "crates/module-browser-control" }
+nihility-secret = { path = "crates/secret" }
 nihility-server = { path = "server" }
 nihility-server-entity = { path = "crates/server-entity" }
 nihility-server-migration = { path = "crates/server-migration" }
 
+http = { version = "1.4" }
 axum = { version = "0.8" }
+axum-extra = { version = "0.12", features = ["typed-header"] }
+rand = { version = "0.10" }
+argon2 = { version = "0.5" }
+jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
+password-hash = { version = "0.5", features = ["getrandom"] }
 tracing = { version = "0.1", default-features = false }
 tracing-subscriber = { version = "0.3", features = ["local-time", "ansi", "fmt", "std"] }
 tracing-appender = { version = "0.2" }
 uuid = { version = "1.22", default-features = false, features = ["v4"] }
+chrono = { version = "0.4" }
 time = { version = "0.3", default-features = false, features = ["parsing"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 schemars = { version = "1.2", default-features = false, features = ["derive"] }

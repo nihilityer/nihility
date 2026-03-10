@@ -3,9 +3,9 @@ use nihility_server_entity::html_pages;
 use nihility_server_entity::prelude::HtmlPages;
 use sea_orm::{ColumnTrait, DbConn, EntityTrait, QueryFilter};
 
-pub struct HtmlPage;
+pub struct HtmlPageService;
 
-impl HtmlPage {
+impl HtmlPageService {
     pub async fn find_html_by_path(db: &DbConn, path: &str) -> Result<String> {
         match HtmlPages::find()
             .filter(html_pages::Column::Path.eq(path))

@@ -12,6 +12,10 @@ publish.workspace = true
 
 [dependencies]
 uuid = { workspace = true }
+argon2 = { workspace = true }
+password-hash = { workspace = true }
+tracing = { workspace = true }
 sea-orm-migration = { workspace = true }
 
+nihility-secret = { workspace = true }
 nihility-server-entity = { workspace = true }

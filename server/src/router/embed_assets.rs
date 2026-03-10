@@ -1,15 +1,15 @@
+use crate::error::*;
 use axum::body::Body;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::Response;
 use mime_guess::from_path;
 use rust_embed::Embed;
-use crate::error::*;
 
 #[derive(Embed)]
 #[folder = "../frontend/dist"]
 struct Assets;
 
-pub(super) async fn embed_assets_handler(uri: axum::http::Uri) -> Result<Response<Body>> {
+pub(super) async fn embed_assets_handler(uri: http::Uri) -> Result<Response<Body>> {
     let path = uri.path().trim_start_matches('/');
     let path = if path.is_empty() || Assets::get(path).is_none() {
         "index.html"

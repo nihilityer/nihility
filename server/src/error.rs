@@ -9,12 +9,26 @@ pub(crate) type Result<T> = core::result::Result<T, NihilityServerError>;
 pub enum NihilityServerError {
     #[error("Resource Not Found: {0}")]
     NotFound(String),
+    #[error("Invalid Token")]
+    InvalidToken,
+    #[error("Missing Credentials")]
+    MissingCredentials,
+    #[error("Wrong Credentials")]
+    WrongCredentials,
+    #[error("Invalid Config: {0}")]
+    Config(String),
     #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error(transparent)]
     Db(#[from] sea_orm::DbErr),
     #[error(transparent)]
     Http(#[from] http::Error),
+    #[error("Build password hash error: {0}")]
+    PasswordHash(argon2::password_hash::Error),
+    #[error("JWT encoding error: {0}")]
+    Jwt(#[from] jsonwebtoken::errors::Error),
+    #[error(transparent)]
+    InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
 }
 
 impl IntoResponse for NihilityServerError {
@@ -24,6 +38,22 @@ impl IntoResponse for NihilityServerError {
                 let err_msg = format!("Resource Not Found: {}", name);
                 error!("{}", err_msg);
                 (StatusCode::NOT_FOUND, err_msg)
+            }
+            NihilityServerError::InvalidToken => {
+                (StatusCode::BAD_REQUEST, "Invalid token".to_string())
+            }
+            NihilityServerError::MissingCredentials => {
+                (StatusCode::BAD_REQUEST, "Missing Credentials".to_string())
+            }
+            NihilityServerError::WrongCredentials => {
+                (StatusCode::UNAUTHORIZED, "Wrong credentials".to_string())
+            }
+            NihilityServerError::Config(desc) => {
+                error!("Invalid config: {}", desc);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Invalid Config".to_string(),
+                )
             }
             NihilityServerError::IO(e) => {
                 error!("Internal server error: {}", e);
@@ -42,6 +72,24 @@ impl IntoResponse for NihilityServerError {
             NihilityServerError::Http(e) => {
                 error!("Http error: {}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Http Error".to_string())
+            }
+            NihilityServerError::PasswordHash(e) => {
+                error!("Build Password Hash Error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Build Password Hash Error".to_string(),
+                )
+            }
+            NihilityServerError::Jwt(e) => {
+                error!("JWT error: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Jwt Error".to_string())
+            }
+            NihilityServerError::InvalidHeaderValue(e) => {
+                error!("Invalid Header Value: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Invalid Header Value".to_string(),
+                )
             }
         }
         .into_response()

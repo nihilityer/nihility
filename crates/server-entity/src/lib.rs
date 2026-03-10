@@ -3,3 +3,4 @@
 pub mod prelude;
 
 pub mod html_pages;
+pub mod user;

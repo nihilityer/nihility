@@ -135,7 +135,7 @@
                         <div class="flex-1 min-w-0">
                             <div class="flex justify-between mb-1 font-bold">
                                 <span>{{ msg.title }}</span>
-                                <span class="opacity-80">{{ msg.time }}</span>
+                                <span class="opacity-80">{{ formatRelativeTime(msg.time) }}</span>
                             </div>
                             <div class="opacity-90 line-clamp-2">
                                 {{ msg.content }}
@@ -149,7 +149,7 @@
 </div>
 
 <script>
-    const {createApp, ref, onMounted, onUnmounted, nextTick, watch} = Vue;
+    const {createApp, ref, onMounted, nextTick, watch} = Vue;
 
     createApp({
         setup() {
@@ -161,6 +161,7 @@
             const messageRefs = ref([]);
             const deviceContainer = ref(null);
             const messageList = ref(null);
+            const accessToken = ref('');
 
             // Update Clock
             const updateTime = () => {
@@ -171,6 +172,34 @@
                     minute: '2-digit'
                 });
                 currentDate.value = now.toLocaleDateString('zh-CN', {month: 'short', day: 'numeric', weekday: 'short'});
+            };
+
+            // Format relative time
+            const formatRelativeTime = (timestamp) => {
+                if (!timestamp) return '';
+
+                const now = new Date();
+                const msgTime = new Date(timestamp);
+                const diffMs = now - msgTime;
+                const diffSeconds = Math.floor(diffMs / 1000);
+                const diffMinutes = Math.floor(diffSeconds / 60);
+                const diffHours = Math.floor(diffMinutes / 60);
+                const diffDays = Math.floor(diffHours / 24);
+                const diffWeeks = Math.floor(diffDays / 7);
+
+                if (diffSeconds < 60) {
+                    return '刚刚';
+                } else if (diffMinutes < 60) {
+                    return `${diffMinutes}分钟前`;
+                } else if (diffHours < 24) {
+                    return `${diffHours}小时前`;
+                } else if (diffDays < 7) {
+                    return `${diffDays}天前`;
+                } else if (diffWeeks < 4) {
+                    return `${diffWeeks}周前`;
+                } else {
+                    return msgTime.toLocaleDateString('zh-CN', {month: 'short', day: 'numeric'});
+                }
             };
 
             // Set message ref for each item
@@ -241,40 +270,45 @@
                 }
             });
 
+            // Auth Request
+            const fetchAuth = async (username, password) => {
+                try {
+                    const response = await fetch('/auth', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: username,
+                            password: password
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Auth failed');
+                    }
+
+                    const data = await response.json();
+                    accessToken.value = data.access_token;
+                    return true;
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    return false;
+                }
+            };
+
             // Fetch Messages
             const fetchMessages = async () => {
-                const token = localStorage.getItem('nihility_auth_token');
-
-                if (!token) {
-                    // Mock Data Fallback
-                    console.log('No token found, using mock data.');
-                    setTimeout(() => {
-                        messages.value = [
-                            {id: 1, title: '系统警报', content: '固件更新可用 v2.4.0', time: '10:42'},
-                            {id: 2, title: '用户登录', content: '管理员从 192.168.1.5 登录', time: '09:15'},
-                            {id: 3, title: '传感器错误', content: '温度传感器 #4 读数超出范围', time: '昨天'},
-                            {id: 4, title: '备份完成', content: '每日备份成功完成', time: '昨天'},
-                            {
-                                id: 5,
-                                title: '安全警告',
-                                content: '检测到来自 IP 10.0.0.5 的登录失败尝试',
-                                time: '2 天前'
-                            },
-                            {id: 6, title: '维护通知', content: '计划维护窗口将于凌晨 02:00 开始', time: '3 天前'},
-                            {id: 7, title: '存储空间不足', content: '磁盘使用率超过 90% 阈值', time: '1 周前'},
-                            {id: 8, title: '更新成功', content: '模块 B 已成功更新至 v1.2', time: '1 周前'}
-                        ];
-                        loading.value = false;
-                    }, 500);
+                if (!accessToken.value) {
+                    loading.value = false;
                     return;
                 }
 
-                // Real API Call
                 try {
-                    const response = await fetch('/api/message', {
+                    const response = await fetch('/api/test', {
                         method: 'GET',
                         headers: {
-                            'Authorization': `Bearer ${token}`,
+                            'Authorization': `Bearer ${accessToken.value}`,
                             'Content-Type': 'application/json'
                         }
                     });
@@ -289,7 +323,7 @@
                             id: 99,
                             title: '连接错误',
                             content: '获取消息失败',
-                            time: '现在'
+                            time: new Date().toISOString()
                         }
                     ];
                 } finally {
@@ -300,7 +334,86 @@
             onMounted(() => {
                 updateTime();
                 setInterval(updateTime, 1000);
-                fetchMessages();
+
+                // Get credentials from URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                const username = urlParams.get('username');
+                const password = urlParams.get('password');
+
+                if (username && password) {
+                    fetchAuth(username, password).then((success) => {
+                        if (success) {
+                            fetchMessages();
+                        } else {
+                            loading.value = false;
+                            messages.value = [
+                                {
+                                    id: 99,
+                                    title: '认证失败',
+                                    content: '用户名或密码错误',
+                                    time: new Date().toISOString()
+                                }
+                            ];
+                        }
+                    });
+                } else {
+                    // Mock Data Fallback for demo
+                    console.log('No credentials found, using mock data.');
+                    const now = new Date();
+                    setTimeout(() => {
+                        messages.value = [
+                            {
+                                id: 1,
+                                title: '系统警报',
+                                content: '固件更新可用 v2.4.0',
+                                time: new Date(now - 10 * 60 * 1000).toISOString()
+                            },
+                            {
+                                id: 2,
+                                title: '用户登录',
+                                content: '管理员从 192.168.1.5 登录',
+                                time: new Date(now - 60 * 60 * 1000).toISOString()
+                            },
+                            {
+                                id: 3,
+                                title: '传感器错误',
+                                content: '温度传感器 #4 读数超出范围',
+                                time: new Date(now - 24 * 60 * 60 * 1000).toISOString()
+                            },
+                            {
+                                id: 4,
+                                title: '备份完成',
+                                content: '每日备份成功完成',
+                                time: new Date(now - 24 * 60 * 60 * 1000).toISOString()
+                            },
+                            {
+                                id: 5,
+                                title: '安全警告',
+                                content: '检测到来自 IP 10.0.0.5 的登录失败尝试',
+                                time: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString()
+                            },
+                            {
+                                id: 6,
+                                title: '维护通知',
+                                content: '计划维护窗口将于凌晨 02:00 开始',
+                                time: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString()
+                            },
+                            {
+                                id: 7,
+                                title: '存储空间不足',
+                                content: '磁盘使用率超过 90% 阈值',
+                                time: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
+                            },
+                            {
+                                id: 8,
+                                title: '更新成功',
+                                content: '模块 B 已成功更新至 v1.2',
+                                time: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
+                            }
+                        ];
+                        loading.value = false;
+                    }, 500);
+                }
 
                 // Focus the container for keyboard events
                 if (deviceContainer.value) {
@@ -318,7 +431,8 @@
                 messageList,
                 setMessageRef,
                 selectIndex,
-                handleKeydown
+                handleKeydown,
+                formatRelativeTime
             };
         }
     }).mount('#app');
