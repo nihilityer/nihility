@@ -40,7 +40,7 @@ impl IntoResponse for NihilityServerError {
                 (StatusCode::NOT_FOUND, err_msg)
             }
             NihilityServerError::InvalidToken => {
-                (StatusCode::BAD_REQUEST, "Invalid token".to_string())
+                (StatusCode::UNAUTHORIZED, "Invalid token".to_string())
             }
             NihilityServerError::MissingCredentials => {
                 (StatusCode::BAD_REQUEST, "Missing Credentials".to_string())

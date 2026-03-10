@@ -39,8 +39,8 @@ http.interceptors.response.use(
     if (error.response?.status === 401) {
       const authStore = useAuthStore()
       authStore.clearToken()
-      ElMessage.error('Token 已失效，请重新配置')
-      router.push('/token-config')
+      ElMessage.error('登录已失效，请重新登录')
+      router.push('/login')
     } else if (error.response?.status === 403) {
       ElMessage.error('没有权限访问该资源')
     } else if (error.response?.status === 404) {

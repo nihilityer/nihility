@@ -15,10 +15,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '仪表盘', icon: 'HomeFilled', requiresAuth: true },
       },
       {
-        path: 'token-config',
-        name: 'TokenConfig',
-        component: () => import('@/views/TokenConfig.vue'),
-        meta: { title: 'Token 配置', icon: 'Key', requiresAuth: false },
+        path: 'login',
+        name: 'Login',
+        component: () => import('@/views/Login.vue'),
+        meta: { title: '登录', icon: 'User', requiresAuth: false },
       },
     ],
   },
@@ -54,11 +54,11 @@ router.beforeEach((to, _from) => {
 
   const hasToken = authStore.hasToken()
 
-  // 只检查需要认证的页面，未配置 token 时跳转到配置页
+  // 只检查需要认证的页面，未配置 token 时跳转到登录页
   if (to.meta.requiresAuth && !hasToken) {
-    return '/token-config'
+    return '/login'
   }
-  // 允许已登录用户访问 token 配置页以修改 token
+  // 允许已登录用户访问登录页
 })
 
 export default router

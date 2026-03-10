@@ -14,14 +14,10 @@ const handleToggleSidebar = () => {
   layoutStore.toggleSidebar()
 }
 
-const handleTokenConfig = () => {
-  router.push('/token-config')
-}
-
 const handleLogout = () => {
-  authStore.clearToken()
-  ElMessage.success('Token 已清除')
-  router.push('/token-config')
+  authStore.logout()
+  ElMessage.success('已退出登录')
+  router.push('/login')
 }
 
 // 面包屑路径
@@ -55,11 +51,8 @@ const breadcrumbs = computed(() => {
         <el-button class="user-button" :icon="'User'" circle />
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item :icon="'Key'" @click="handleTokenConfig">
-              Token 配置
-            </el-dropdown-item>
-            <el-dropdown-item divided :icon="'SwitchButton'" @click="handleLogout">
-              清除 Token
+            <el-dropdown-item :icon="'SwitchButton'" @click="handleLogout">
+              退出登录
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>

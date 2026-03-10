@@ -27,11 +27,6 @@ const activeMenu = computed(() => route.path)
         <el-icon><HomeFilled /></el-icon>
         <template #title>仪表盘</template>
       </el-menu-item>
-
-      <el-menu-item index="/token-config">
-        <el-icon><Key /></el-icon>
-        <template #title>Token 配置</template>
-      </el-menu-item>
     </el-menu>
   </div>
 </template>
