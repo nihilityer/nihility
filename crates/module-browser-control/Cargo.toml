@@ -11,7 +11,6 @@ homepage.workspace = true
 publish.workspace = true
 
 [dependencies]
-nihility-log = { workspace = true }
 nihility-config = { workspace = true }
 nihility-module = { workspace = true }
 
@@ -21,12 +20,13 @@ schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-
-chromiumoxide = { workspace = true }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
 futures = { workspace = true }
+
 tokio = { workspace = true }
+chromiumoxide = { workspace = true }
 
 [dev-dependencies]
+nihility-log = { workspace = true }
 image = { workspace = true }

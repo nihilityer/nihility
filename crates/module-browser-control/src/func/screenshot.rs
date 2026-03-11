@@ -14,7 +14,7 @@ pub struct ScreenshotParam {
 }
 
 impl BrowserControl {
-    pub(crate) async fn screenshot(&mut self, param: ScreenshotParam) -> Result<Vec<u8>> {
+    pub async fn screenshot(&mut self, param: ScreenshotParam) -> Result<Vec<u8>> {
         match self.page_map.get(&Uuid::from_str(&param.page_id)?) {
             None => Err(BrowserControlError::Operation(format!(
                 "Invalid page id: {}",
