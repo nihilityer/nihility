@@ -7,6 +7,7 @@ use serde_json::Value;
 use tracing::debug;
 
 pub mod open_page;
+pub mod press_key;
 pub mod screenshot;
 
 #[async_trait::async_trait(?Send)]

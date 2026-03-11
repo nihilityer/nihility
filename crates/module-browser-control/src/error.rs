@@ -10,6 +10,8 @@ pub enum BrowserControlError {
     Operation(String),
     #[error(transparent)]
     Cdp(#[from] chromiumoxide::error::CdpError),
+    #[error("Build execute parameters failed with {0}")]
+    ExecuteParam(String),
     #[error(transparent)]
     Uuid(#[from] uuid::Error),
 }
