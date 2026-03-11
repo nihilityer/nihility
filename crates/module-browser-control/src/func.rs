@@ -1,3 +1,4 @@
+use crate::func::open_page::OpenPageParam;
 use crate::func::screenshot::ScreenshotParam;
 use crate::BrowserControl;
 use nihility_module::{Callable, FunctionMetadata, Module};
@@ -5,6 +6,7 @@ use schemars::schema_for;
 use serde_json::Value;
 use tracing::debug;
 
+pub mod open_page;
 pub mod screenshot;
 
 #[async_trait::async_trait(?Send)]
@@ -25,6 +27,9 @@ impl Callable for BrowserControl {
             "Browser control call_mut"
         );
         match func_name {
+            "open_page" => Ok(serde_json::to_value(
+                self.open_page(serde_json::from_value(param)?).await?,
+            )?),
             "screenshot" => Ok(serde_json::to_value(
                 self.screenshot(serde_json::from_value(param)?).await?,
             )?),
@@ -39,12 +44,21 @@ impl Module for BrowserControl {
     }
 
     fn perm_func(&mut self) -> Vec<FunctionMetadata> {
-        vec![FunctionMetadata {
-            name: "screenshot".to_string(),
-            desc: "截图网页，".to_string(),
-            tags: vec![],
-            params: serde_json::to_value(schema_for!(ScreenshotParam))
-                .expect("browser control func screenshot build param"),
-        }]
+        vec![
+            FunctionMetadata {
+                name: "open_page".to_string(),
+                desc: "打开网页".to_string(),
+                tags: vec![],
+                params: serde_json::to_value(schema_for!(OpenPageParam))
+                    .expect("browser control func open_page build param"),
+            },
+            FunctionMetadata {
+                name: "screenshot".to_string(),
+                desc: "截图网页".to_string(),
+                tags: vec![],
+                params: serde_json::to_value(schema_for!(ScreenshotParam))
+                    .expect("browser control func screenshot build param"),
+            },
+        ]
     }
 }

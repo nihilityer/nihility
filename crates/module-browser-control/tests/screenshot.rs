@@ -1,8 +1,11 @@
 use image::ImageReader;
 use nihility_module::{Callable, Module};
+use nihility_module_browser_control::func::open_page::OpenPageParam;
 use nihility_module_browser_control::func::screenshot::ScreenshotParam;
 use nihility_module_browser_control::BrowserControl;
 use std::io::Cursor;
+use std::time::Duration;
+use tokio::time::sleep;
 use tracing::info;
 
 #[tokio::test]
@@ -12,12 +15,28 @@ async fn test_screenshot() {
         .await
         .expect("init failed");
     info!("{:?}", browser_control.perm_func());
+    let page_id = serde_json::from_value(
+        browser_control
+            .call_mut(
+                "open_page",
+                serde_json::to_value(OpenPageParam {
+                    url: "http://127.0.0.1:8080/html/test".to_string(),
+                })
+                .expect("failed to build open_page param"),
+            )
+            .await
+            .expect("call failed"),
+    )
+    .expect("open page result exception");
+    info!(page_id=%page_id);
+    sleep(Duration::from_secs(1)).await;
     let image_data: Vec<u8> = serde_json::from_value(
         browser_control
             .call_mut(
                 "screenshot",
                 serde_json::to_value(ScreenshotParam {
-                    url: "http://127.0.0.1:8080/html/test".to_string(),
+                    page_id,
+                    selector: Some("#app > div".to_string()),
                 })
                 .expect("failed to build screenshot param"),
             )

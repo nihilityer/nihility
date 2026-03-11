@@ -15,6 +15,7 @@ nihility-log = { workspace = true }
 nihility-config = { workspace = true }
 nihility-module = { workspace = true }
 
+uuid = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }

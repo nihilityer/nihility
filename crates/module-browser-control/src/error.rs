@@ -6,6 +6,10 @@ pub enum BrowserControlError {
     Config(#[from] nihility_config::ConfigError),
     #[error("Build browser config failed with {0}")]
     BuildConfig(String),
+    #[error("Operation error: {0}")]
+    Operation(String),
     #[error(transparent)]
     Cdp(#[from] chromiumoxide::error::CdpError),
+    #[error(transparent)]
+    Uuid(#[from] uuid::Error),
 }

@@ -3,10 +3,12 @@ pub mod func;
 
 use crate::error::*;
 use chromiumoxide::handler::viewport::Viewport;
-use chromiumoxide::{Browser, BrowserConfig};
+use chromiumoxide::{Browser, BrowserConfig, Page};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::{error, info};
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BrowserControlConfig {
@@ -16,6 +18,7 @@ pub struct BrowserControlConfig {
 
 pub struct BrowserControl {
     browser: Browser,
+    page_map: HashMap<Uuid, Page>,
 }
 
 impl BrowserControl {
@@ -51,7 +54,10 @@ impl BrowserControl {
                 }
             }
         });
-        Ok(BrowserControl { browser })
+        Ok(BrowserControl {
+            browser,
+            page_map: HashMap::new(),
+        })
     }
 }
 
