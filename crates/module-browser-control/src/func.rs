@@ -46,6 +46,10 @@ impl Callable for BrowserControl {
 }
 
 impl Module for BrowserControl {
+    fn description(&self) -> &str {
+        "浏览器控制模块，提供网页打开、截图、按键输入等浏览器自动化功能"
+    }
+
     fn no_perm_func(&self) -> Vec<FunctionMetadata> {
         vec![FunctionMetadata {
             name: "screenshot".to_string(),

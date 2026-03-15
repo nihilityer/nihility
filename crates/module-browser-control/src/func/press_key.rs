@@ -6,9 +6,12 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+/// 模拟按键输入
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PressKeyParam {
+    /// 标签页对应的Id
     pub page_id: String,
+    /// 按键Key
     pub key: String,
 }
 

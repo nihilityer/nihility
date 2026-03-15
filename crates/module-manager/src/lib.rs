@@ -2,20 +2,20 @@ pub mod error;
 
 use crate::error::*;
 use nihility_module::{FunctionMetadata, Module};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::error;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ModuleType {
     Embed(EmbedModule),
     Wasm(String),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum EmbedModule {
     BrowserControl,
     EdgeDeviceControl,
@@ -24,6 +24,8 @@ pub enum EmbedModule {
 /// 模块功能列表
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ModuleFunctions {
+    /// 模块描述
+    pub description: String,
     /// 低权限功能列表
     pub no_perm_func: Vec<FunctionMetadata>,
     /// 高权限功能列表
@@ -96,6 +98,7 @@ impl ModuleManager {
         for (module_type, module) in &self.modules {
             let mut module_guard = module.write().await;
             let functions = ModuleFunctions {
+                description: module_guard.description().to_string(),
                 no_perm_func: module_guard.no_perm_func(),
                 perm_func: module_guard.perm_func(),
             };
@@ -117,6 +120,7 @@ impl ModuleManager {
 
         let mut module_guard = module.write().await;
         Ok(ModuleFunctions {
+            description: module_guard.description().to_string(),
             no_perm_func: module_guard.no_perm_func(),
             perm_func: module_guard.perm_func(),
         })
@@ -199,5 +203,81 @@ impl ModuleManagerConfig {
         enable_modules.extend(wasms.into_iter().map(ModuleType::Wasm));
 
         ModuleManagerConfig { enable_modules }
+    }
+}
+
+impl Serialize for EmbedModule {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = match self {
+            EmbedModule::BrowserControl => "browser-control",
+            EmbedModule::EdgeDeviceControl => "edge-device-control",
+        };
+        serializer.serialize_str(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for EmbedModule {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "browser-control" => Ok(EmbedModule::BrowserControl),
+            "edge-device-control" => Ok(EmbedModule::EdgeDeviceControl),
+            _ => Err(serde::de::Error::custom(format!(
+                "unknown embed module: {}",
+                s
+            ))),
+        }
+    }
+}
+
+impl Serialize for ModuleType {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = match self {
+            ModuleType::Embed(embed) => {
+                let embed_str = match embed {
+                    EmbedModule::BrowserControl => "browser-control",
+                    EmbedModule::EdgeDeviceControl => "edge-device-control",
+                };
+                format!("embed-{}", embed_str)
+            }
+            ModuleType::Wasm(path) => format!("wasm-{}", path),
+        };
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for ModuleType {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+
+        if let Some(embed_name) = s.strip_prefix("embed-") {
+            match embed_name {
+                "browser-control" => Ok(ModuleType::Embed(EmbedModule::BrowserControl)),
+                "edge-device-control" => Ok(ModuleType::Embed(EmbedModule::EdgeDeviceControl)),
+                _ => Err(serde::de::Error::custom(format!(
+                    "unknown embed module: {}",
+                    embed_name
+                ))),
+            }
+        } else if let Some(wasm_path) = s.strip_prefix("wasm-") {
+            Ok(ModuleType::Wasm(wasm_path.to_string()))
+        } else {
+            Err(serde::de::Error::custom(format!(
+                "invalid module type format: {}, expected 'embed-{{module}}' or 'wasm-{{path}}'",
+                s
+            )))
+        }
     }
 }

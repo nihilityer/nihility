@@ -3,10 +3,14 @@ use crate::EdgeDeviceControl;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// 连接新设备
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ConnectDeviceParam {
+    /// 设备Id
     pub device_id: String,
+    /// 需要显示在设备屏幕上的网页Url
     pub mapping_url: String,
+    /// 屏幕映射网页中哪个元素
     pub screenshot_selector: Option<String>,
 }
 

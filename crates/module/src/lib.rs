@@ -23,6 +23,8 @@ pub trait Callable {
 /// 子模块特征
 #[async_trait::async_trait]
 pub trait Module: Callable {
+    /// 获取模块简介
+    fn description(&self) -> &str;
     /// 子模块支持调用的所有低权限方法列表
     fn no_perm_func(&self) -> Vec<FunctionMetadata>;
     /// 子模块支持调用的所有高权限方法列表

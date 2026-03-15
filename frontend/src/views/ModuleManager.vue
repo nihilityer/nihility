@@ -21,12 +21,12 @@
             <el-menu-item
                 v-for="(module, index) in modules"
                 :key="index"
-                :index="getModuleKey(module)"
+                :index="module"
             >
               <el-icon>
                 <Grid/>
               </el-icon>
-              <span>{{ getModuleName(module) }}</span>
+              <span>{{ module }}</span>
             </el-menu-item>
           </el-menu>
         </el-card>
@@ -37,9 +37,20 @@
         <el-card v-if="selectedModule">
           <template #header>
             <div class="card-header">
-              <span>{{ getModuleName(currentModuleType) }} - 功能列表</span>
+              <span>{{ currentModuleType }} - 功能列表</span>
             </div>
           </template>
+
+          <!-- 模块简介 -->
+          <el-alert
+            v-if="functions?.description"
+            :title="`${currentModuleType} 模块简介`"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px"
+          >
+            {{ functions.description }}
+          </el-alert>
 
           <el-tabs v-model="activeTab">
             <!-- 低权限功能 -->
@@ -64,12 +75,29 @@
                         </el-tag>
                       </div>
                       <div class="params">
-                        <h4>参数定义:</h4>
+                        <h4>参数输入:</h4>
+
+                        <!-- 模式切换 -->
+                        <el-radio-group v-model="inputMode" size="small" style="margin-bottom: 10px">
+                          <el-radio-button value="form">表单模式</el-radio-button>
+                          <el-radio-button value="json">JSON 模式</el-radio-button>
+                        </el-radio-group>
+
+                        <!-- 表单模式 -->
+                        <SchemaFormInput
+                          v-if="inputMode === 'form'"
+                          :ref="(el) => { if (el) formRefs[func.name] = el as any }"
+                          :schema="func.params"
+                          :function-name="func.name"
+                        />
+
+                        <!-- JSON 模式（备用） -->
                         <el-input
-                            v-model="paramInputs[func.name]"
-                            :rows="4"
-                            placeholder="请输入 JSON 格式的参数"
-                            type="textarea"
+                          v-else
+                          v-model="paramInputs[func.name]"
+                          :rows="4"
+                          placeholder="请输入 JSON 格式的参数"
+                          type="textarea"
                         />
                       </div>
                       <div class="actions">
@@ -106,12 +134,29 @@
                         </el-tag>
                       </div>
                       <div class="params">
-                        <h4>参数定义:</h4>
+                        <h4>参数输入:</h4>
+
+                        <!-- 模式切换 -->
+                        <el-radio-group v-model="inputMode" size="small" style="margin-bottom: 10px">
+                          <el-radio-button value="form">表单模式</el-radio-button>
+                          <el-radio-button value="json">JSON 模式</el-radio-button>
+                        </el-radio-group>
+
+                        <!-- 表单模式 -->
+                        <SchemaFormInput
+                          v-if="inputMode === 'form'"
+                          :ref="(el) => { if (el) formRefs[func.name] = el as any }"
+                          :schema="func.params"
+                          :function-name="func.name"
+                        />
+
+                        <!-- JSON 模式（备用） -->
                         <el-input
-                            v-model="paramInputs[func.name]"
-                            :rows="4"
-                            placeholder="请输入 JSON 格式的参数"
-                            type="textarea"
+                          v-else
+                          v-model="paramInputs[func.name]"
+                          :rows="4"
+                          placeholder="请输入 JSON 格式的参数"
+                          type="textarea"
                         />
                       </div>
                       <div class="actions">
@@ -162,6 +207,7 @@ import {
   type ModuleType,
   queryModuleFunctions,
 } from '@/api/modules'
+import SchemaFormInput from '@/components/SchemaFormInput.vue'
 
 const loading = ref(false)
 const modules = ref<ModuleType[]>([])
@@ -172,6 +218,8 @@ const activeTab = ref('no_perm')
 const activeFunction = ref<string[]>([])
 const paramInputs = ref<Record<string, string>>({})
 const callResult = ref<string>('')
+const formRefs = ref<Record<string, InstanceType<typeof SchemaFormInput>>>({})
+const inputMode = ref<'form' | 'json'>('form')
 
 // 加载模块列表
 const loadModules = async () => {
@@ -186,27 +234,10 @@ const loadModules = async () => {
   }
 }
 
-// 获取模块键值
-const getModuleKey = (module: ModuleType): string => {
-  if (module.Embed === 'BrowserControl') return 'browser_control'
-  if (module.Embed === 'EdgeDeviceControl') return 'edge_device_control'
-  if (module.Wasm) return `wasm_${module.Wasm}`
-  return 'unknown'
-}
-
-// 获取模块名称
-const getModuleName = (module: ModuleType | null): string => {
-  if (!module) return ''
-  if (module.Embed === 'BrowserControl') return '浏览器控制'
-  if (module.Embed === 'EdgeDeviceControl') return '边缘设备控制'
-  if (module.Wasm) return `WASM 模块: ${module.Wasm}`
-  return '未知模块'
-}
-
 // 选择模块
 const handleModuleSelect = async (key: string) => {
   selectedModule.value = key
-  const module = modules.value.find((m) => getModuleKey(m) === key)
+  const module = modules.value.find((m) => m === key)
   if (!module) return
 
   currentModuleType.value = module
@@ -227,12 +258,31 @@ const callFunction = async (funcName: string, isMut: boolean) => {
   }
 
   let param: any
-  try {
-    const paramStr = paramInputs.value[funcName] || '{}'
-    param = JSON.parse(paramStr)
-  } catch (error) {
-    ElMessage.error('参数格式错误，请输入有效的 JSON')
-    return
+
+  if (inputMode.value === 'form') {
+    // 表单模式：从表单组件获取数据
+    const formRef = formRefs.value[funcName]
+    if (!formRef) {
+      ElMessage.error('表单未初始化')
+      return
+    }
+
+    const isValid = await formRef.validate()
+    if (!isValid) {
+      ElMessage.error('请检查表单输入')
+      return
+    }
+
+    param = formRef.getFormData()
+  } else {
+    // JSON 模式：解析文本输入
+    try {
+      const paramStr = paramInputs.value[funcName] || '{}'
+      param = JSON.parse(paramStr)
+    } catch (error) {
+      ElMessage.error('参数格式错误，请输入有效的 JSON')
+      return
+    }
   }
 
   try {

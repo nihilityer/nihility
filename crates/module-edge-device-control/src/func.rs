@@ -45,6 +45,10 @@ impl Callable for EdgeDeviceControl {
 }
 
 impl Module for EdgeDeviceControl {
+    fn description(&self) -> &str {
+        "边缘设备控制模块，提供设备发现、连接、屏幕推送等远程设备管理功能"
+    }
+
     fn no_perm_func(&self) -> Vec<FunctionMetadata> {
         vec![FunctionMetadata {
             name: "list_devices".to_string(),

@@ -1,18 +1,28 @@
 import http from './http'
 
-export interface ModuleType {
-    Embed?: 'BrowserControl' | 'EdgeDeviceControl'
-    Wasm?: string
+// ModuleType is now a string in format: "embed-{module}" or "wasm-{path}"
+export type ModuleType = string
+
+// JSON Schema 类型定义
+export interface JSONSchema {
+    $schema?: string
+    title?: string
+    type?: string | string[]
+    properties?: Record<string, any>
+    required?: string[]
+    default?: any
+    [key: string]: any
 }
 
 export interface FunctionMetadata {
     name: string
     desc: string
     tags: string[]
-    params: any
+    params: JSONSchema
 }
 
 export interface ModuleFunctions {
+    description: string
     no_perm_func: FunctionMetadata[]
     perm_func: FunctionMetadata[]
 }

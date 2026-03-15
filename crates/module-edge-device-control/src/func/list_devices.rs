@@ -2,6 +2,7 @@ use crate::EdgeDeviceControl;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// 列出所有设备Id
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ListDevicesParam {}
 

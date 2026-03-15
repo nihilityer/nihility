@@ -26,12 +26,12 @@ publish = false
 
 [workspace.dependencies]
 nihility-config = { path = "crates/config" }
+nihility-edge-protocol = { path = "crates/edge-protocol" }
 nihility-log = { path = "crates/log" }
 nihility-module = { path = "crates/module" }
 nihility-module-browser-control = { path = "crates/module-browser-control" }
 nihility-module-edge-device-control = { path = "crates/module-edge-device-control" }
 nihility-module-manager = { path = "crates/module-manager" }
-nihility-edge-protocol = { path = "crates/edge-protocol" }
 nihility-secret = { path = "crates/secret" }
 nihility-server = { path = "server" }
 nihility-server-entity = { path = "crates/server-entity" }

@@ -4,8 +4,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// 打开新标签页
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct OpenPageParam {
+    /// 网页地址
     pub url: String,
 }
 

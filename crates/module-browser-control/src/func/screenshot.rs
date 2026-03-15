@@ -7,9 +7,12 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
+/// 截图网页
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ScreenshotParam {
+    /// 标签页对于的Id
     pub page_id: String,
+    /// 需要被截图元素的`selector`
     pub selector: Option<String>,
 }
 
