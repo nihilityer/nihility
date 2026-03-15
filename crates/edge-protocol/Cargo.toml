@@ -12,4 +12,3 @@ publish.workspace = true
 
 [dependencies]
 rkyv = { workspace = true }
-bytecheck = "0.8"
