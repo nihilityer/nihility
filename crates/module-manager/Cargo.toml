@@ -1,0 +1,30 @@
+[package]
+name = "nihility-module-manager"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[dependencies]
+nihility-config = { workspace = true }
+nihility-module = { workspace = true }
+
+nihility-module-browser-control = { workspace = true }
+nihility-module-edge-device-control = { workspace = true }
+
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+tokio = { workspace = true }
+
+[dev-dependencies]
+nihility-log = { workspace = true }
+image = { workspace = true }

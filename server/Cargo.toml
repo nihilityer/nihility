@@ -19,6 +19,7 @@ http = { workspace = true }
 axum = { workspace = true }
 axum-extra = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
 argon2 = { workspace = true }
 chrono = { workspace = true }
@@ -32,3 +33,4 @@ sea-orm = { workspace = true }
 nihility-secret = { workspace = true }
 nihility-server-entity = { workspace = true }
 nihility-server-migration = { workspace = true }
+nihility-module-manager = { workspace = true }

@@ -108,7 +108,6 @@ pub(crate) async fn start_screen_refresh(
                 ))
             })?;
         }
-        Result::Ok(())
     });
     Ok(join_handle)
 }

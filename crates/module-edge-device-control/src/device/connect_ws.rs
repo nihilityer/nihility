@@ -32,7 +32,7 @@ pub async fn connect_ws<S: Into<SocketAddr>>(
                     break;
                 }
             };
-            if let Err(e) = ws_sink.send(WsMessage::Binary(data)).await {
+            if let Err(e) = ws_sink.send(WsMessage::Binary(data.into())).await {
                 error!("WebSocket send error: {}", e);
                 break;
             }

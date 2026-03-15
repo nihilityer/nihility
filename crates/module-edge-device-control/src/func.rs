@@ -10,7 +10,7 @@ mod list_devices;
 use crate::func::connect_device::ConnectDeviceParam;
 use crate::func::list_devices::ListDevicesParam;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl Callable for EdgeDeviceControl {
     async fn call(&self, func_name: &str, param: Value) -> anyhow::Result<Value> {
         debug!(

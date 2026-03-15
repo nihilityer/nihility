@@ -11,7 +11,7 @@ pub mod open_page;
 pub mod press_key;
 pub mod screenshot;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl Callable for BrowserControl {
     async fn call(&self, func_name: &str, param: Value) -> anyhow::Result<Value> {
         debug!(

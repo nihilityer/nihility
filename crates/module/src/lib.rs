@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionMetadata {
     pub name: String,
     pub desc: String,
@@ -11,7 +11,7 @@ pub struct FunctionMetadata {
 }
 
 /// 子模块方法调用特征
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait Callable {
     /// 不修改模块内部数据的方法调用
     async fn call(&self, func_name: &str, param: Value) -> Result<Value>;

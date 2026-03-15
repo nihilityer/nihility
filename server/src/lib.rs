@@ -4,10 +4,12 @@ mod service;
 
 use crate::error::*;
 use crate::router::JwtKeys;
+use nihility_module_manager::ModuleManager;
 use nihility_secret::generate_secret;
 use nihility_server_migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -31,9 +33,10 @@ pub struct DatabaseConfig {
 }
 
 #[derive(Clone)]
-struct AppState {
+pub struct AppState {
     jwt: JwtKeys,
     conn: DatabaseConnection,
+    module_manager: Arc<ModuleManager>,
 }
 
 pub async fn start_server(config: ServerConfig) -> Result<()> {
@@ -50,7 +53,14 @@ pub async fn start_server(config: ServerConfig) -> Result<()> {
 
     let jwt = JwtKeys::new(config.jwt_secret.as_bytes(), config.jwt_expiration);
 
-    let state = AppState { conn, jwt };
+    // 初始化模块管理器
+    let module_manager = Arc::new(ModuleManager::init_from_file_config().await?);
+
+    let state = AppState {
+        conn,
+        jwt,
+        module_manager,
+    };
     let app = router::app_router(state.clone()).with_state(state);
 
     let listener = tokio::net::TcpListener::bind((config.addr, config.port)).await?;

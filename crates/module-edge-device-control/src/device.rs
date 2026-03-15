@@ -18,7 +18,6 @@ mod task;
 pub enum DeviceStatus {
     Discovered,
     Connected,
-    Disconnected,
 }
 
 #[derive(Debug)]

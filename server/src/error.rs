@@ -29,6 +29,8 @@ pub enum NihilityServerError {
     Jwt(#[from] jsonwebtoken::errors::Error),
     #[error(transparent)]
     InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
+    #[error(transparent)]
+    ModuleManager(#[from] nihility_module_manager::error::ModuleManagerError),
 }
 
 impl IntoResponse for NihilityServerError {
@@ -89,6 +91,13 @@ impl IntoResponse for NihilityServerError {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Invalid Header Value".to_string(),
+                )
+            }
+            NihilityServerError::ModuleManager(e) => {
+                error!("Module Manager Error: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Module Manager Error".to_string(),
                 )
             }
         }

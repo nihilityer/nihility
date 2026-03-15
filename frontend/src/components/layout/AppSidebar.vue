@@ -1,7 +1,8 @@
-<script setup lang="ts">
+<script lang="ts" setup>
 import {computed} from 'vue'
 import {useRoute} from 'vue-router'
 import {useLayoutStore} from '@/stores/layout'
+import {Grid, HomeFilled} from '@element-plus/icons-vue'
 
 const route = useRoute()
 const layoutStore = useLayoutStore()
@@ -17,21 +18,29 @@ const activeMenu = computed(() => route.path)
     </div>
 
     <el-menu
-      :default-active="activeMenu"
-      :collapse="layoutStore.isCollapsed"
-      :collapse-transition="true"
-      router
-      class="sidebar-menu"
+        :collapse="layoutStore.isCollapsed"
+        :collapse-transition="true"
+        :default-active="activeMenu"
+        class="sidebar-menu"
+        router
     >
       <el-menu-item index="/dashboard">
-        <el-icon><HomeFilled /></el-icon>
+        <el-icon>
+          <HomeFilled/>
+        </el-icon>
         <template #title>仪表盘</template>
+      </el-menu-item>
+      <el-menu-item index="/modules">
+        <el-icon>
+          <Grid/>
+        </el-icon>
+        <template #title>模块管理</template>
       </el-menu-item>
     </el-menu>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
 .app-sidebar {
   display: flex;
   flex-direction: column;

@@ -18,7 +18,7 @@ pub fn start_discovery(
                 ServiceEvent::ServiceResolved(info) => {
                     let device_id = info.get_fullname().to_string();
                     if let Some(addr) = info.get_addresses().iter().next() {
-                        let socket_addr = SocketAddr::new(*addr, info.get_port());
+                        let socket_addr = SocketAddr::new(addr.to_ip_addr(), info.get_port());
 
                         // 尝试从 TXT 记录解析设备信息
                         let device_info = parse_device_info_from_txt(&info, &device_id).ok_or(
@@ -45,7 +45,7 @@ pub fn start_discovery(
 }
 
 fn parse_device_info_from_txt(
-    service_info: &mdns_sd::ServiceInfo,
+    service_info: &mdns_sd::ResolvedService,
     device_id: &str,
 ) -> Option<DeviceInfo> {
     let properties = service_info.get_properties();
