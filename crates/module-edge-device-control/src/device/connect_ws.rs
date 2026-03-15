@@ -25,14 +25,14 @@ pub async fn connect_ws<S: Into<SocketAddr>>(
     // 发送任务（应用 → 设备）
     tokio::spawn(async move {
         while let Some(msg) = rx_from_app.recv().await {
-            let data = match bincode::serialize(&msg) {
+            let data = match rkyv::to_bytes::<rkyv::rancor::Error>(&msg) {
                 Ok(data) => data,
                 Err(e) => {
                     error!("Failed to serialize the websocket message: {}", e);
                     break;
                 }
             };
-            if let Err(e) = ws_sink.send(WsMessage::Binary(data.into())).await {
+            if let Err(e) = ws_sink.send(WsMessage::Binary(data.to_vec().into())).await {
                 error!("WebSocket send error: {}", e);
                 break;
             }
@@ -43,7 +43,7 @@ pub async fn connect_ws<S: Into<SocketAddr>>(
     tokio::spawn(async move {
         while let Some(msg_result) = ws_stream.next().await {
             match msg_result {
-                Ok(WsMessage::Binary(data)) => match bincode::deserialize::<Message>(&data) {
+                Ok(WsMessage::Binary(data)) => match rkyv::from_bytes::<Message, rkyv::rancor::Error>(&data) {
                     Ok(msg) => {
                         debug!("Received message: {:?}", msg);
                         let _ = tx_to_app.send(msg);

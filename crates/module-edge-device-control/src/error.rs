@@ -18,7 +18,7 @@ pub enum EdgeDeviceControlError {
     Image(#[from] image::ImageError),
 
     #[error("Serialization error: {0}")]
-    Serialization(#[from] bincode::Error),
+    Serialization(String),
 
     #[error("Browser control error: {0}")]
     BrowserControl(#[from] nihility_module_browser_control::error::BrowserControlError),

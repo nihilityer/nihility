@@ -65,7 +65,7 @@ thiserror = { version = "2.0" }
 anyhow = { version = "1.0" }
 mdns-sd = { version = "0.18" }
 tokio-tungstenite = { version = "0.28" }
-bincode = { version = "1.3" }
+rkyv = { version = "0.8", features = ["bytecheck"] }
 
 sea-orm = { version = "~2.0.0-rc.36", features = ["macros", "serde_json", "with-json", "with-uuid", "runtime-tokio-rustls"] }
 sea-orm-migration = { version = "~2.0.0-rc.36" }

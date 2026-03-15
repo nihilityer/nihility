@@ -2,10 +2,10 @@ use crate::{
     key::KeyEvent,
     screen::{FullScreenData, IncrementalScreenData},
 };
-use serde::{Deserialize, Serialize};
+use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
 /// 双向消息枚举
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize)]
 pub enum Message {
     // 设备发送的消息
     KeyEvent(KeyEvent),
@@ -16,7 +16,7 @@ pub enum Message {
 }
 
 /// 设备信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize)]
 pub struct DeviceInfo {
     pub device_id: String,
     pub screen_width: u16,

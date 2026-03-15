@@ -11,5 +11,5 @@ homepage.workspace = true
 publish.workspace = true
 
 [dependencies]
-serde = { workspace = true }
-bincode = { workspace = true }
+rkyv = { workspace = true }
+bytecheck = "0.8"
