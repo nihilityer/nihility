@@ -4,10 +4,11 @@
 
 extern crate alloc;
 
-use crate::net::get_device_id;
+use crate::display::init_display;
 use crate::net::mdns::start_mdns;
 use crate::net::wifi::{dhcp_task, net_task, run_ap_mode, run_client_mode, AP_SSID, GW_IP};
-use crate::storage::{init_storage, load_credentials};
+use crate::net::{get_device_id, MAX_RETRY_COUNT};
+use crate::storage::{clear_credentials, init_storage, load_credentials};
 use crate::work::config_server::run_config_server;
 use crate::work::ws_server::run_ws_server;
 use alloc::boxed::Box;
@@ -22,9 +23,10 @@ use esp_hal::clock::CpuClock;
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::wifi::{AccessPointConfig, ClientConfig};
-use log::info;
+use log::{error, info};
 use smoltcp::wire::Ipv4Cidr;
 
+mod display;
 mod net;
 mod storage;
 mod work;
@@ -39,6 +41,15 @@ pub async fn init(spawner: Spawner) -> Result<()> {
     esp_rtos::start(TimerGroup::new(peripherals.TIMG0).timer0);
 
     init_storage(peripherals.FLASH)?;
+    init_display(
+        peripherals.GPIO4,
+        peripherals.GPIO8,
+        peripherals.GPIO9,
+        peripherals.GPIO10,
+        peripherals.SPI2,
+        peripherals.GPIO12,
+        peripherals.GPIO11,
+    )?;
 
     let credentials = load_credentials()?;
 
@@ -72,7 +83,15 @@ pub async fn init(spawner: Spawner) -> Result<()> {
 
         spawner.spawn(run_client_mode(controller, client_config))?;
 
+        let mut retry_count = 0;
         while !sta_stack.is_link_up() || !sta_stack.is_config_up() {
+            if retry_count >= MAX_RETRY_COUNT {
+                error!("Retry limit reached");
+                clear_credentials()?;
+                Timer::after(Duration::from_secs(3)).await;
+                esp_hal::system::software_reset();
+            }
+            retry_count += 1;
             Timer::after(Duration::from_secs(1)).await
         }
 

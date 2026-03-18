@@ -6,6 +6,7 @@ use esp_hal::efuse::Efuse;
 pub mod mdns;
 pub mod wifi;
 
+pub(crate) const MAX_RETRY_COUNT: usize = 5;
 pub(crate) const SERVICE_PORT: u16 = 5000;
 
 pub fn get_device_id() -> Result<String> {

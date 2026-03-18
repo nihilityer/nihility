@@ -51,13 +51,12 @@ embassy-net = { version = "0.8", features = [
     "udp",
 ] }
 embassy-sync = { version = "0.7" }
-embassy-futures = { version = "0.1" }
 embassy-executor = { version = "0.9.1", features = ["log"] }
 embassy-time = { version = "0.5.0", features = ["log"] }
 
-embedded-io = "0.7.1"
 embedded-io-async = "0.7.0"
 embedded-storage = { version = "0.3" }
+embedded-hal-bus = { version = "0.3" }
 
 smoltcp = { version = "0.12.0", default-features = false, features = [
     "log",
@@ -89,6 +88,7 @@ edge-nal = { version = "0.6" }
 edge-nal-embassy = { version = "0.8" }
 
 nihility-edge-protocol = { path = "../../crates/edge-protocol" }
+ssd1683 = { version = "0.3.0" }
 
 [profile.dev]
 # Rust debug is too slow.
