@@ -48,7 +48,7 @@ impl Device {
         &mut self,
         devices: Arc<RwLock<HashMap<String, Device>>>,
         browser_control: Arc<RwLock<BrowserControl>>,
-        mapping_url: &str,
+        page_id: &str,
         screenshot_selector: Option<String>,
     ) -> Result<()> {
         if self.status == DeviceStatus::Connected {
@@ -58,7 +58,7 @@ impl Device {
             )));
         }
         if let Some(addr) = &self.addr {
-            let (tx, rx) = connect_ws(addr.clone()).await?;
+            let (tx, rx) = connect_ws(*addr).await?;
             self.ws_sender = Some(tx);
             start_message_handler(
                 self.info.device_id.clone(),
@@ -78,7 +78,7 @@ impl Device {
             self.info.clone(),
             devices.clone(),
             browser_control.clone(),
-            mapping_url,
+            page_id,
             screenshot_selector.clone(),
         )
         .await?;

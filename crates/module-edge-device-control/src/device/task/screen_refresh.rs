@@ -2,21 +2,20 @@ use crate::device::screen_processor::ScreenProcessor;
 use crate::device::Device;
 use crate::error::*;
 use nihility_edge_protocol::{DeviceInfo, Message};
-use nihility_module_browser_control::func::open_page::OpenPageParam;
 use nihility_module_browser_control::func::screenshot::ScreenshotParam;
 use nihility_module_browser_control::BrowserControl;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 /// 新建一个线程处理设备屏幕刷新推送
 pub(crate) async fn start_screen_refresh(
     device_info: DeviceInfo,
     devices: Arc<RwLock<HashMap<String, Device>>>,
     browser_control: Arc<RwLock<BrowserControl>>,
-    mapping_url: &str,
+    page_id: &str,
     screenshot_selector: Option<String>,
 ) -> Result<JoinHandle<Result<()>>> {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(
@@ -26,28 +25,13 @@ pub(crate) async fn start_screen_refresh(
         "Started screenshot task for device {} with interval {}ms",
         device_info.device_id, device_info.screen_refresh_interval
     );
-    let page_id = browser_control
-        .write()
-        .await
-        .open_page(OpenPageParam {
-            url: mapping_url.to_string(),
-        })
-        .await?;
+
     let mut processor = ScreenProcessor::new(device_info.screen_width, device_info.screen_height);
 
-    {
-        let mut devices_guard = devices.write().await;
-        let device = devices_guard
-            .get_mut(&device_info.device_id)
-            .ok_or_else(|| {
-                EdgeDeviceControlError::DeviceStatus(format!(
-                    "device {} not found",
-                    device_info.device_id
-                ))
-            })?;
-        device.page_id = Some(page_id.clone());
-    }
-
+    let screenshot_param = ScreenshotParam {
+        page_id: page_id.to_string(),
+        selector: screenshot_selector.clone(),
+    };
     let join_handle = tokio::spawn(async move {
         loop {
             interval.tick().await;
@@ -63,14 +47,12 @@ pub(crate) async fn start_screen_refresh(
                     continue;
                 }
             }
+            debug!("Screenshot refresh task");
 
             let png_data = browser_control
                 .read()
                 .await
-                .screenshot(ScreenshotParam {
-                    page_id: page_id.clone(),
-                    selector: screenshot_selector.clone(),
-                })
+                .screenshot(screenshot_param.clone())
                 .await?;
 
             // 3. 转换为 1-bit 位图

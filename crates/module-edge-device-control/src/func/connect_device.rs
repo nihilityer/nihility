@@ -1,5 +1,6 @@
 use crate::error::*;
 use crate::EdgeDeviceControl;
+use nihility_module_browser_control::func::open_page::OpenPageParam;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -25,12 +26,23 @@ impl EdgeDeviceControl {
         let device = devices_guard.get_mut(&param.device_id).ok_or_else(|| {
             EdgeDeviceControlError::DeviceStatus(format!("device {} not found", param.device_id))
         })?;
+        let page_id = self
+            .browser_control
+            .as_ref()
+            .unwrap()
+            .write()
+            .await
+            .open_page(OpenPageParam {
+                url: param.mapping_url.to_string(),
+            })
+            .await?;
+        device.page_id = Some(page_id.clone());
 
         device
             .connect(
                 self.devices.clone(),
                 self.browser_control.as_ref().unwrap().clone(),
-                &param.mapping_url,
+                &page_id,
                 param.screenshot_selector,
             )
             .await?;

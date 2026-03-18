@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
 /// 完整屏幕数据（初次连接或全量刷新）

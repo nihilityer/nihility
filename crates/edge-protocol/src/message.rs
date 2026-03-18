@@ -2,6 +2,7 @@ use crate::{
     key::KeyEvent,
     screen::{FullScreenData, IncrementalScreenData},
 };
+use alloc::string::String;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
 /// 双向消息枚举

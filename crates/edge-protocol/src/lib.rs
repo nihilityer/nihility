@@ -1,3 +1,7 @@
+#![no_std]
+
+extern crate alloc;
+
 pub mod key;
 pub mod message;
 pub mod screen;
