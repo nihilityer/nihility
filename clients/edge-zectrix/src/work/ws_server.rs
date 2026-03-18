@@ -16,6 +16,7 @@ use edge_ws::{FrameHeader, FrameType};
 use embassy_net::Stack;
 use embedded_io_async::{Read, Write};
 use log::info;
+use nihility_edge_protocol::Message;
 
 pub async fn run_ws_server(stack: Stack<'_>) -> Result<()> {
     info!("Running websocket server on {SERVICE_PORT}");
@@ -93,11 +94,12 @@ impl Handler for WsHandler {
 
             let mut socket = conn.unbind()?;
 
-            let mut buf = Vec::with_capacity_in(8192, esp_alloc::ExternalMemory);
-            buf.resize(8192, 0);
+            // 增大缓冲区以容纳完整屏幕数据 (400x300/8 = 15KB + 序列化开销)
+            let mut buf = Vec::with_capacity_in(40960, esp_alloc::ExternalMemory);
+            buf.resize(40960, 0);
 
             loop {
-                let mut header = FrameHeader::recv(&mut socket)
+                let header = FrameHeader::recv(&mut socket)
                     .await
                     .map_err(WsHandlerError::Ws)?;
                 let payload = header
@@ -113,31 +115,61 @@ impl Handler for WsHandler {
                         );
                     }
                     FrameType::Binary(_) => {
-                        info!("Got {header}, with payload {payload:?}");
+                        info!("Got {header}, binary payload size: {} bytes", payload.len());
+
+                        // 反序列化消息
+                        match rkyv::from_bytes::<Message, rkyv::rancor::Error>(payload) {
+                            Ok(msg) => {
+                                match msg {
+                                    Message::FullScreenUpdate(screen_data) => {
+                                        info!(
+                                            "Received full screen update: {}x{}, {} bytes",
+                                            screen_data.width,
+                                            screen_data.height,
+                                            screen_data.data.len()
+                                        );
+                                        // TODO: 实际的屏幕渲染逻辑
+                                    }
+                                    Message::IncrementalScreenUpdate(screen_data) => {
+                                        info!(
+                                            "Received incremental screen update: {} regions",
+                                            screen_data.regions.len()
+                                        );
+                                        // TODO: 实际的增量屏幕更新逻辑
+                                    }
+                                    Message::KeyEvent(key_event) => {
+                                        info!("Received key event: {:?}", key_event);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                info!("Failed to deserialize message: {:?}", e);
+                            }
+                        }
                     }
                     FrameType::Close => {
                         info!("Got {header}, client closed the connection cleanly");
                         break;
                     }
+                    FrameType::Ping => {
+                        info!("Got {header}, sending Pong");
+                        // 响应 Ping 帧
+                        let mut pong_header = header;
+                        pong_header.mask_key = None;
+                        pong_header.frame_type = FrameType::Pong;
+                        pong_header
+                            .send(&mut socket)
+                            .await
+                            .map_err(WsHandlerError::Ws)?;
+                        pong_header
+                            .send_payload(&mut socket, payload)
+                            .await
+                            .map_err(WsHandlerError::Ws)?;
+                    }
                     _ => {
                         info!("Got {header}");
                     }
                 }
-
-                // Echo it back now
-                header.mask_key = None; // Servers never mask the payload
-
-                if matches!(header.frame_type, FrameType::Ping) {
-                    header.frame_type = FrameType::Pong;
-                }
-
-                info!("Echoing back as {header}");
-
-                header.send(&mut socket).await.map_err(WsHandlerError::Ws)?;
-                header
-                    .send_payload(&mut socket, payload)
-                    .await
-                    .map_err(WsHandlerError::Ws)?;
             }
         }
 

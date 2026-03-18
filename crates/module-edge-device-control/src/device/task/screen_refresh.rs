@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 /// 新建一个线程处理设备屏幕刷新推送
 pub(crate) async fn start_screen_refresh(
@@ -47,7 +47,6 @@ pub(crate) async fn start_screen_refresh(
                     continue;
                 }
             }
-            debug!("Screenshot refresh task");
 
             let png_data = browser_control
                 .read()

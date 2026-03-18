@@ -43,13 +43,15 @@ pub async fn connect_ws<S: Into<SocketAddr>>(
     tokio::spawn(async move {
         while let Some(msg_result) = ws_stream.next().await {
             match msg_result {
-                Ok(WsMessage::Binary(data)) => match rkyv::from_bytes::<Message, rkyv::rancor::Error>(&data) {
-                    Ok(msg) => {
-                        debug!("Received message: {:?}", msg);
-                        let _ = tx_to_app.send(msg);
+                Ok(WsMessage::Binary(data)) => {
+                    match rkyv::from_bytes::<Message, rkyv::rancor::Error>(&data) {
+                        Ok(msg) => {
+                            debug!("Received message: {:?}", msg);
+                            let _ = tx_to_app.send(msg);
+                        }
+                        Err(e) => error!("Failed to deserialize message: {}", e),
                     }
-                    Err(e) => error!("Failed to deserialize message: {}", e),
-                },
+                }
                 Err(e) => {
                     error!("WebSocket receive error: {}", e);
                     break;
