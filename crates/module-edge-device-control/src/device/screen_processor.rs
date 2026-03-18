@@ -4,22 +4,33 @@
 
 use crate::error::*;
 use nihility_edge_protocol::{FullScreenData, IncrementalScreenData, UpdateRegion};
+use tracing::{debug, info};
+
+/// 屏幕更新类型
+#[derive(Debug)]
+pub enum ScreenUpdate {
+    /// 全量更新（首次或大幅变化）
+    Full(FullScreenData),
+    /// 增量更新（中等变化）
+    Incremental(IncrementalScreenData),
+    /// 跳过更新（变化太小）
+    Skip,
+}
 
 #[derive(Clone, Debug)]
 pub struct ScreenProcessor {
     width: u16,
     height: u16,
     last_frame: Option<Vec<u8>>,
-    threshold_percent: u8,
 }
 
 impl ScreenProcessor {
+    /// 创建屏幕处理器
     pub fn new(width: u16, height: u16) -> Self {
         Self {
             width,
             height,
             last_frame: None,
-            threshold_percent: 5,
         }
     }
 
@@ -77,36 +88,58 @@ impl ScreenProcessor {
         (width * height).div_ceil(8)
     }
 
-    /// 比较两帧，生成增量更新
-    pub fn diff(&mut self, new_frame: &FullScreenData) -> Option<IncrementalScreenData> {
+    /// 比较两帧，确定更新类型
+    pub fn diff(&mut self, new_frame: FullScreenData) -> ScreenUpdate {
         let Some(ref last_frame) = self.last_frame else {
-            // 首次推送，保存帧并返回 None（使用全量更新）
+            // 首次推送，使用全量更新
+            info!("First frame: sending full screen update");
             self.last_frame = Some(new_frame.data.clone());
-            return None;
+            return ScreenUpdate::Full(new_frame);
         };
 
         // 计算变化像素数
         let changed_pixels = self.count_changed_pixels(last_frame, &new_frame.data);
         let total_pixels = self.width as usize * self.height as usize;
+
+        // 没有像素更新时不发送任何消息
+        if changed_pixels == 0 {
+            return ScreenUpdate::Skip;
+        }
+
         let change_percent = (changed_pixels * 100) / total_pixels;
 
-        // 如果变化小于阈值，跳过更新
-        if change_percent < self.threshold_percent as usize {
-            return None;
-        }
+        debug!(
+            "Screen change detected: {}/{} pixels ({}.{:02}%)",
+            changed_pixels,
+            total_pixels,
+            change_percent,
+            ((changed_pixels * 10000) / total_pixels) % 100
+        );
 
-        // 如果变化超过 50%，建议全量更新
+        // 如果变化超过 50%，使用全量更新
         if change_percent > 50 {
+            info!(
+                "Large change detected ({}% > 50%), sending full screen update",
+                change_percent
+            );
             self.last_frame = Some(new_frame.data.clone());
-            return None; // 调用者应发送 FullScreenUpdate
+            return ScreenUpdate::Full(new_frame);
         }
 
-        // 生成增量更新区域（按 64x64 块检测）
-        let regions = self.generate_regions(last_frame, &new_frame.data);
+        // 生成合并后的单一更新区域
+        let regions = self.generate_merged_region(last_frame, &new_frame.data);
+
+        let regions_bytes: usize = regions.iter().map(|r| r.data.len()).sum();
+        info!(
+            "Incremental update: {} region(s), {} bytes total ({}% change)",
+            regions.len(),
+            regions_bytes,
+            change_percent
+        );
 
         self.last_frame = Some(new_frame.data.clone());
 
-        Some(IncrementalScreenData {
+        ScreenUpdate::Incremental(IncrementalScreenData {
             regions,
             timestamp: new_frame.timestamp,
         })
@@ -119,35 +152,18 @@ impl ScreenProcessor {
             .sum()
     }
 
-    fn generate_regions(&self, old: &[u8], new: &[u8]) -> Vec<UpdateRegion> {
-        let block_size = 64u16;
-        let mut regions = Vec::new();
+    /// 生成合并后的单一更新区域（计算所有变化像素的边界矩形）
+    fn generate_merged_region(&self, old: &[u8], new: &[u8]) -> Vec<UpdateRegion> {
+        let mut min_x = self.width;
+        let mut min_y = self.height;
+        let mut max_x = 0u16;
+        let mut max_y = 0u16;
+        let mut has_change = false;
 
-        for by in (0..self.height).step_by(block_size as usize) {
-            for bx in (0..self.width).step_by(block_size as usize) {
-                let block_width = (self.width - bx).min(block_size);
-                let block_height = (self.height - by).min(block_size);
-
-                if self.is_block_changed(old, new, bx, by, block_width, block_height) {
-                    let data = self.extract_block(new, bx, by, block_width, block_height);
-                    regions.push(UpdateRegion {
-                        x: bx,
-                        y: by,
-                        width: block_width,
-                        height: block_height,
-                        data,
-                    });
-                }
-            }
-        }
-
-        regions
-    }
-
-    fn is_block_changed(&self, old: &[u8], new: &[u8], x: u16, y: u16, w: u16, h: u16) -> bool {
-        for row in y..(y + h) {
-            for col in x..(x + w) {
-                let bit_index = (row as usize * self.width as usize) + col as usize;
+        // 遍历所有像素，找出变化区域的边界
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let bit_index = (y as usize * self.width as usize) + x as usize;
                 let byte_index = bit_index / 8;
                 let bit_offset = 7 - (bit_index % 8);
 
@@ -155,11 +171,33 @@ impl ScreenProcessor {
                 let new_bit = (new[byte_index] >> bit_offset) & 1;
 
                 if old_bit != new_bit {
-                    return true;
+                    has_change = true;
+                    min_x = min_x.min(x);
+                    min_y = min_y.min(y);
+                    max_x = max_x.max(x);
+                    max_y = max_y.max(y);
                 }
             }
         }
-        false
+
+        if !has_change {
+            return Vec::new();
+        }
+
+        // 计算边界矩形的宽高
+        let width = max_x - min_x + 1;
+        let height = max_y - min_y + 1;
+
+        // 提取该区域的数据
+        let data = self.extract_block(new, min_x, min_y, width, height);
+
+        vec![UpdateRegion {
+            x: min_x,
+            y: min_y,
+            width,
+            height,
+            data,
+        }]
     }
 
     fn extract_block(&self, frame: &[u8], x: u16, y: u16, w: u16, h: u16) -> Vec<u8> {

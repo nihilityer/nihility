@@ -1,4 +1,4 @@
-use crate::device::screen_processor::ScreenProcessor;
+use crate::device::screen_processor::{ScreenProcessor, ScreenUpdate};
 use crate::device::Device;
 use crate::error::*;
 use nihility_edge_protocol::{DeviceInfo, Message};
@@ -22,11 +22,15 @@ pub(crate) async fn start_screen_refresh(
         device_info.screen_refresh_interval as u64,
     ));
     info!(
-        "Started screenshot task for device {} with interval {}ms",
-        device_info.device_id, device_info.screen_refresh_interval
+        "Started screenshot task for device {} with interval {}ms (auto: 0% -> region, >50% -> full)",
+        device_info.device_id,
+        device_info.screen_refresh_interval
     );
 
-    let mut processor = ScreenProcessor::new(device_info.screen_width, device_info.screen_height);
+    let mut processor = ScreenProcessor::new(
+        device_info.screen_width,
+        device_info.screen_height,
+    );
 
     let screenshot_param = ScreenshotParam {
         page_id: page_id.to_string(),
@@ -63,31 +67,67 @@ pub(crate) async fn start_screen_refresh(
                 }
             };
 
-            // 4. 计算增量更新
-            let msg = match processor.diff(&full_screen) {
-                Some(incremental) => Message::IncrementalScreenUpdate(incremental),
-                None => Message::FullScreenUpdate(full_screen),
-            };
+            // 4. 计算更新类型
 
-            let devices_guard = devices.read().await;
-            let device = devices_guard.get(&device_info.device_id).ok_or_else(|| {
-                EdgeDeviceControlError::DeviceStatus(format!(
-                    "device {} not found",
-                    device_info.device_id
-                ))
-            })?;
-            let ws_sender = device.ws_sender.as_ref().ok_or_else(|| {
-                EdgeDeviceControlError::DeviceStatus(format!(
-                    "device {} not connecting",
-                    device_info.device_id
-                ))
-            })?;
-            ws_sender.send(msg).map_err(|_| {
-                EdgeDeviceControlError::DeviceStatus(format!(
-                    "device {} ws_sender failed to send",
-                    device_info.device_id
-                ))
-            })?;
+            // 5. 根据更新类型决定是否发送消息
+            match processor.diff(full_screen) {
+                ScreenUpdate::Full(full_screen) => {
+                    info!(
+                        "Sending full screen update to device {} ({} bytes)",
+                        device_info.device_id,
+                        full_screen.data.len()
+                    );
+                    let msg = Message::FullScreenUpdate(full_screen);
+
+                    let devices_guard = devices.read().await;
+                    let device = devices_guard.get(&device_info.device_id).ok_or_else(|| {
+                        EdgeDeviceControlError::DeviceStatus(format!(
+                            "device {} not found",
+                            device_info.device_id
+                        ))
+                    })?;
+                    let ws_sender = device.ws_sender.as_ref().ok_or_else(|| {
+                        EdgeDeviceControlError::DeviceStatus(format!(
+                            "device {} not connecting",
+                            device_info.device_id
+                        ))
+                    })?;
+                    ws_sender.send(msg).map_err(|_| {
+                        EdgeDeviceControlError::DeviceStatus(format!(
+                            "device {} ws_sender failed to send",
+                            device_info.device_id
+                        ))
+                    })?;
+                }
+                ScreenUpdate::Incremental(incremental) => {
+                    info!(
+                        "Sending incremental screen update to device {}",
+                        device_info.device_id
+                    );
+                    let msg = Message::IncrementalScreenUpdate(incremental);
+
+                    let devices_guard = devices.read().await;
+                    let device = devices_guard.get(&device_info.device_id).ok_or_else(|| {
+                        EdgeDeviceControlError::DeviceStatus(format!(
+                            "device {} not found",
+                            device_info.device_id
+                        ))
+                    })?;
+                    let ws_sender = device.ws_sender.as_ref().ok_or_else(|| {
+                        EdgeDeviceControlError::DeviceStatus(format!(
+                            "device {} not connecting",
+                            device_info.device_id
+                        ))
+                    })?;
+                    ws_sender.send(msg).map_err(|_| {
+                        EdgeDeviceControlError::DeviceStatus(format!(
+                            "device {} ws_sender failed to send",
+                            device_info.device_id
+                        ))
+                    })?;
+                }
+                ScreenUpdate::Skip => {}
+            }
         }
     });
     Ok(join_handle)
