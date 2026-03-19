@@ -1,5 +1,6 @@
 mod embed_assets;
 mod html_page;
+mod html_page_manager;
 mod jwt;
 mod module_manager;
 mod test;
@@ -7,6 +8,7 @@ mod test;
 use crate::error::*;
 use crate::router::embed_assets::embed_assets_handler;
 use crate::router::html_page::get_html_page;
+use crate::router::html_page_manager::html_page_manager_router;
 use crate::router::jwt::{auth_middleware, authorize};
 use crate::router::module_manager::module_manager_router;
 use crate::router::test::test;
@@ -23,6 +25,7 @@ pub(super) fn app_router(state: AppState) -> Router<AppState> {
             Router::new()
                 .route("/test", get(test))
                 .nest("/modules", module_manager_router())
+                .nest("/html-pages", html_page_manager_router())
                 .fallback(any(not_found))
                 .layer(middleware::from_fn_with_state(
                     state.jwt.clone(),

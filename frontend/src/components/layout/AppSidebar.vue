@@ -2,7 +2,7 @@
 import {computed} from 'vue'
 import {useRoute} from 'vue-router'
 import {useLayoutStore} from '@/stores/layout'
-import {Grid, HomeFilled} from '@element-plus/icons-vue'
+import {Document, Grid, HomeFilled} from '@element-plus/icons-vue'
 
 const route = useRoute()
 const layoutStore = useLayoutStore()
@@ -35,6 +35,12 @@ const activeMenu = computed(() => route.path)
           <Grid/>
         </el-icon>
         <template #title>模块管理</template>
+      </el-menu-item>
+      <el-menu-item index="/html-pages">
+        <el-icon>
+          <Document/>
+        </el-icon>
+        <template #title>HTML 页面管理</template>
       </el-menu-item>
     </el-menu>
   </div>

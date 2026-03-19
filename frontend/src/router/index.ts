@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
                 meta: {title: '模块管理', icon: 'Grid', requiresAuth: true},
             },
             {
+                path: 'html-pages',
+                name: 'HtmlPageManager',
+                component: () => import('@/views/HtmlPageManager.vue'),
+                meta: {title: 'HTML 页面管理', icon: 'Document', requiresAuth: true},
+            },
+            {
                 path: 'login',
                 name: 'Login',
                 component: () => import('@/views/Login.vue'),
