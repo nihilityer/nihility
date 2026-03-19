@@ -1,11 +1,22 @@
 use crate::error::*;
+use crate::router::not_found;
 use crate::AppState;
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::routing::{get, post};
+use axum::{Json, Router};
 use nihility_module_manager::{ModuleFunctions, ModuleType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+
+pub fn module_manager_router() -> Router<AppState> {
+    Router::new()
+        .route("/", get(get_loaded_modules))
+        .route("/functions", get(query_all_functions))
+        .route("/{module_type}/functions", get(query_module_functions))
+        .route("/{module_type}/call", post(call_module_function))
+        .fallback(not_found)
+}
 
 /// 查询所有模块的功能列表
 pub async fn query_all_functions(
