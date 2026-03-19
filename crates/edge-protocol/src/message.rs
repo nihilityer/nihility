@@ -1,6 +1,6 @@
 use crate::{
     key::KeyEvent,
-    screen::{FullScreenData, IncrementalScreenData},
+    screen::{FullScreenData, IncrementalScreenData, ScreenConfig},
 };
 use alloc::string::String;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
@@ -23,4 +23,5 @@ pub struct DeviceInfo {
     pub screen_width: u16,
     pub screen_height: u16,
     pub screen_refresh_interval: usize,
+    pub screen_config: ScreenConfig,
 }

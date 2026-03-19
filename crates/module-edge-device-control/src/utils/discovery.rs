@@ -1,6 +1,6 @@
 use crate::error::*;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
-use nihility_edge_protocol::DeviceInfo;
+use nihility_edge_protocol::{DeviceInfo, ScreenConfig, ScreenRotation};
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -66,10 +66,40 @@ fn parse_device_info_from_txt(
         .parse::<usize>()
         .ok()?;
 
+    // 解析屏幕配置（带默认值）
+    let rotation = properties
+        .get("screen_rotation")
+        .and_then(|v| v.val_str().parse::<u16>().ok())
+        .and_then(|r| match r {
+            0 => Some(ScreenRotation::Rotate0),
+            90 => Some(ScreenRotation::Rotate90),
+            180 => Some(ScreenRotation::Rotate180),
+            270 => Some(ScreenRotation::Rotate270),
+            _ => None,
+        })
+        .unwrap_or(ScreenRotation::Rotate0);
+
+    let mirror_horizontal = properties
+        .get("screen_mirror_h")
+        .and_then(|v| v.val_str().parse::<bool>().ok())
+        .unwrap_or(false);
+
+    let mirror_vertical = properties
+        .get("screen_mirror_v")
+        .and_then(|v| v.val_str().parse::<bool>().ok())
+        .unwrap_or(false);
+
+    let screen_config = ScreenConfig {
+        rotation,
+        mirror_horizontal,
+        mirror_vertical,
+    };
+
     Some(DeviceInfo {
         device_id: device_id.to_string(),
         screen_width,
         screen_height,
         screen_refresh_interval,
+        screen_config,
     })
 }

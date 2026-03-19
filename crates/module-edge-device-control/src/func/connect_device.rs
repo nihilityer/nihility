@@ -3,6 +3,7 @@ use crate::EdgeDeviceControl;
 use nihility_module_browser_control::func::open_page::OpenPageParam;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 /// 连接新设备
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -37,6 +38,10 @@ impl EdgeDeviceControl {
             })
             .await?;
         device.page_id = Some(page_id.clone());
+        info!(
+            "connect to device {} with page id: {}",
+            param.device_id, page_id
+        );
 
         device
             .connect(

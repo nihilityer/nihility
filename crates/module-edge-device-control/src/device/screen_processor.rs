@@ -3,7 +3,9 @@
 //! 集成了屏幕转换和差异检测功能
 
 use crate::error::*;
-use nihility_edge_protocol::{FullScreenData, IncrementalScreenData, UpdateRegion};
+use nihility_edge_protocol::{
+    FullScreenData, IncrementalScreenData, ScreenConfig, ScreenRotation, UpdateRegion,
+};
 use tracing::{debug, info};
 
 /// 屏幕更新类型
@@ -22,15 +24,17 @@ pub struct ScreenProcessor {
     width: u16,
     height: u16,
     last_frame: Option<Vec<u8>>,
+    screen_config: ScreenConfig,
 }
 
 impl ScreenProcessor {
     /// 创建屏幕处理器
-    pub fn new(width: u16, height: u16) -> Self {
+    pub fn new(width: u16, height: u16, screen_config: ScreenConfig) -> Self {
         Self {
             width,
             height,
             last_frame: None,
+            screen_config,
         }
     }
 
@@ -69,7 +73,9 @@ impl ScreenProcessor {
 
         for y in 0..self.height {
             for x in 0..self.width {
-                let pixel = gray.get_pixel(x as u32, y as u32)[0];
+                // 应用屏幕配置转换坐标
+                let (src_x, src_y) = self.transform_coordinates(x, y);
+                let pixel = gray.get_pixel(src_x as u32, src_y as u32)[0];
 
                 // 阈值二值化（亮度 >= 128 为白色/1，否则黑色/0）
                 if pixel >= 128 {
@@ -82,6 +88,28 @@ impl ScreenProcessor {
         }
 
         bitmap
+    }
+
+    /// 根据屏幕配置转换坐标
+    fn transform_coordinates(&self, x: u16, y: u16) -> (u16, u16) {
+        let mut tx = x;
+        let mut ty = y;
+
+        // 应用镜像
+        if self.screen_config.mirror_horizontal {
+            tx = self.width - 1 - tx;
+        }
+        if self.screen_config.mirror_vertical {
+            ty = self.height - 1 - ty;
+        }
+
+        // 应用旋转
+        match self.screen_config.rotation {
+            ScreenRotation::Rotate0 => (tx, ty),
+            ScreenRotation::Rotate90 => (ty, self.width - 1 - tx),
+            ScreenRotation::Rotate180 => (self.width - 1 - tx, self.height - 1 - ty),
+            ScreenRotation::Rotate270 => (self.height - 1 - ty, tx),
+        }
     }
 
     fn expected_size(width: usize, height: usize) -> usize {
@@ -188,13 +216,26 @@ impl ScreenProcessor {
         let width = max_x - min_x + 1;
         let height = max_y - min_y + 1;
 
+        // 确保宽度是8的倍数（对于1-bit位图的字节对齐）
+        // 将 min_x 向下对齐到8的倍数
+        let aligned_min_x = (min_x / 8) * 8;
+        // 将宽度向上取整到8的倍数，同时确保不超出屏幕边界
+        let raw_width = (max_x - aligned_min_x + 1) as usize;
+        let aligned_width = raw_width.div_ceil(8) * 8;
+        let final_width = aligned_width.min((self.width - aligned_min_x) as usize) as u16;
+
+        debug!(
+            "Region alignment: original x={}, width={} -> aligned x={}, width={}",
+            min_x, width, aligned_min_x, final_width
+        );
+
         // 提取该区域的数据
-        let data = self.extract_block(new, min_x, min_y, width, height);
+        let data = self.extract_block(new, aligned_min_x, min_y, final_width, height);
 
         vec![UpdateRegion {
-            x: min_x,
+            x: aligned_min_x,
             y: min_y,
-            width,
+            width: final_width,
             height,
             data,
         }]
@@ -221,5 +262,114 @@ impl ScreenProcessor {
         }
 
         block
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transform_coordinates_no_rotation() {
+        let config = ScreenConfig {
+            rotation: ScreenRotation::Rotate0,
+            mirror_horizontal: false,
+            mirror_vertical: false,
+        };
+        let processor = ScreenProcessor::new(400, 300, config);
+
+        assert_eq!(processor.transform_coordinates(0, 0), (0, 0));
+        assert_eq!(processor.transform_coordinates(399, 299), (399, 299));
+        assert_eq!(processor.transform_coordinates(100, 150), (100, 150));
+    }
+
+    #[test]
+    fn test_transform_coordinates_rotate_90() {
+        let config = ScreenConfig {
+            rotation: ScreenRotation::Rotate90,
+            mirror_horizontal: false,
+            mirror_vertical: false,
+        };
+        let processor = ScreenProcessor::new(400, 300, config);
+
+        // (0, 0) -> (0, 399)
+        assert_eq!(processor.transform_coordinates(0, 0), (0, 399));
+        // (399, 0) -> (0, 0)
+        assert_eq!(processor.transform_coordinates(399, 0), (0, 0));
+        // (399, 299) -> (299, 0)
+        assert_eq!(processor.transform_coordinates(399, 299), (299, 0));
+    }
+
+    #[test]
+    fn test_transform_coordinates_rotate_180() {
+        let config = ScreenConfig {
+            rotation: ScreenRotation::Rotate180,
+            mirror_horizontal: false,
+            mirror_vertical: false,
+        };
+        let processor = ScreenProcessor::new(400, 300, config);
+
+        assert_eq!(processor.transform_coordinates(0, 0), (399, 299));
+        assert_eq!(processor.transform_coordinates(399, 299), (0, 0));
+        assert_eq!(processor.transform_coordinates(200, 150), (199, 149));
+    }
+
+    #[test]
+    fn test_transform_coordinates_rotate_270() {
+        let config = ScreenConfig {
+            rotation: ScreenRotation::Rotate270,
+            mirror_horizontal: false,
+            mirror_vertical: false,
+        };
+        let processor = ScreenProcessor::new(400, 300, config);
+
+        // (0, 0) -> (299, 0)
+        assert_eq!(processor.transform_coordinates(0, 0), (299, 0));
+        // (0, 299) -> (0, 0)
+        assert_eq!(processor.transform_coordinates(0, 299), (0, 0));
+        // (399, 299) -> (0, 399)
+        assert_eq!(processor.transform_coordinates(399, 299), (0, 399));
+    }
+
+    #[test]
+    fn test_transform_coordinates_mirror_horizontal() {
+        let config = ScreenConfig {
+            rotation: ScreenRotation::Rotate0,
+            mirror_horizontal: true,
+            mirror_vertical: false,
+        };
+        let processor = ScreenProcessor::new(400, 300, config);
+
+        assert_eq!(processor.transform_coordinates(0, 0), (399, 0));
+        assert_eq!(processor.transform_coordinates(399, 0), (0, 0));
+        assert_eq!(processor.transform_coordinates(200, 150), (199, 150));
+    }
+
+    #[test]
+    fn test_transform_coordinates_mirror_vertical() {
+        let config = ScreenConfig {
+            rotation: ScreenRotation::Rotate0,
+            mirror_horizontal: false,
+            mirror_vertical: true,
+        };
+        let processor = ScreenProcessor::new(400, 300, config);
+
+        assert_eq!(processor.transform_coordinates(0, 0), (0, 299));
+        assert_eq!(processor.transform_coordinates(0, 299), (0, 0));
+        assert_eq!(processor.transform_coordinates(200, 150), (200, 149));
+    }
+
+    #[test]
+    fn test_transform_coordinates_mirror_both() {
+        let config = ScreenConfig {
+            rotation: ScreenRotation::Rotate0,
+            mirror_horizontal: true,
+            mirror_vertical: true,
+        };
+        let processor = ScreenProcessor::new(400, 300, config);
+
+        assert_eq!(processor.transform_coordinates(0, 0), (399, 299));
+        assert_eq!(processor.transform_coordinates(399, 299), (0, 0));
+        assert_eq!(processor.transform_coordinates(200, 150), (199, 149));
     }
 }

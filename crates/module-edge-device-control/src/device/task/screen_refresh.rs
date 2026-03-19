@@ -30,6 +30,7 @@ pub(crate) async fn start_screen_refresh(
     let mut processor = ScreenProcessor::new(
         device_info.screen_width,
         device_info.screen_height,
+        device_info.screen_config,
     );
 
     let screenshot_param = ScreenshotParam {
