@@ -68,7 +68,7 @@ async fn run_mdns(stack: Stack<'_>) -> Result<()> {
         txt_kvs: &[
             ("screen_width", "400"),
             ("screen_height", "300"),
-            ("screen_refresh_interval", "100"),
+            ("screen_refresh_interval", "1000"),
             ("screen_rotation", "0"),
             ("screen_mirror_h", "false"),
             ("screen_mirror_v", "true"),

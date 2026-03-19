@@ -6,7 +6,6 @@ use crate::error::*;
 use nihility_edge_protocol::{
     FullScreenData, IncrementalScreenData, ScreenConfig, ScreenRotation, UpdateRegion,
 };
-use tracing::{debug, info};
 
 /// 屏幕更新类型
 #[derive(Debug)]
@@ -120,7 +119,6 @@ impl ScreenProcessor {
     pub fn diff(&mut self, new_frame: FullScreenData) -> ScreenUpdate {
         let Some(ref last_frame) = self.last_frame else {
             // 首次推送，使用全量更新
-            info!("First frame: sending full screen update");
             self.last_frame = Some(new_frame.data.clone());
             return ScreenUpdate::Full(new_frame);
         };
@@ -136,34 +134,14 @@ impl ScreenProcessor {
 
         let change_percent = (changed_pixels * 100) / total_pixels;
 
-        debug!(
-            "Screen change detected: {}/{} pixels ({}.{:02}%)",
-            changed_pixels,
-            total_pixels,
-            change_percent,
-            ((changed_pixels * 10000) / total_pixels) % 100
-        );
-
         // 如果变化超过 50%，使用全量更新
         if change_percent > 50 {
-            info!(
-                "Large change detected ({}% > 50%), sending full screen update",
-                change_percent
-            );
             self.last_frame = Some(new_frame.data.clone());
             return ScreenUpdate::Full(new_frame);
         }
 
         // 生成合并后的单一更新区域
         let regions = self.generate_merged_region(last_frame, &new_frame.data);
-
-        let regions_bytes: usize = regions.iter().map(|r| r.data.len()).sum();
-        info!(
-            "Incremental update: {} region(s), {} bytes total ({}% change)",
-            regions.len(),
-            regions_bytes,
-            change_percent
-        );
 
         self.last_frame = Some(new_frame.data.clone());
 
@@ -223,11 +201,6 @@ impl ScreenProcessor {
         let raw_width = (max_x - aligned_min_x + 1) as usize;
         let aligned_width = raw_width.div_ceil(8) * 8;
         let final_width = aligned_width.min((self.width - aligned_min_x) as usize) as u16;
-
-        debug!(
-            "Region alignment: original x={}, width={} -> aligned x={}, width={}",
-            min_x, width, aligned_min_x, final_width
-        );
 
         // 提取该区域的数据
         let data = self.extract_block(new, aligned_min_x, min_y, final_width, height);

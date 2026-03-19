@@ -116,29 +116,17 @@ impl Handler for WsHandler {
                         );
                     }
                     FrameType::Binary(_) => {
-                        info!("Got {header}, binary payload size: {} bytes", payload.len());
-
                         // 反序列化消息
                         match rkyv::from_bytes::<Message, rkyv::rancor::Error>(payload) {
                             Ok(msg) => {
                                 match msg {
                                     Message::FullScreenUpdate(screen_data) => {
-                                        info!(
-                                            "Received full screen update: {}x{}, {} bytes",
-                                            screen_data.width,
-                                            screen_data.height,
-                                            screen_data.data.len()
-                                        );
                                         // 执行全量屏幕更新
                                         if let Err(e) = full_screen_update(&screen_data.data) {
                                             info!("Failed to update screen: {:?}", e);
                                         }
                                     }
                                     Message::IncrementalScreenUpdate(screen_data) => {
-                                        info!(
-                                            "Received incremental screen update: {} regions",
-                                            screen_data.regions.len()
-                                        );
                                         // 执行增量屏幕更新
                                         if let Err(e) = incremental_screen_update(&screen_data.regions) {
                                             info!("Failed to update screen incrementally: {:?}", e);

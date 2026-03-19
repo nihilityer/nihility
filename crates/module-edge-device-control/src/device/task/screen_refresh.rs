@@ -22,7 +22,7 @@ pub(crate) async fn start_screen_refresh(
         device_info.screen_refresh_interval as u64,
     ));
     info!(
-        "Started screenshot task for device {} with interval {}ms (auto: 0% -> region, >50% -> full)",
+        "Screen refresh task started for device {} (interval: {}ms)",
         device_info.device_id,
         device_info.screen_refresh_interval
     );
@@ -73,11 +73,7 @@ pub(crate) async fn start_screen_refresh(
             // 5. 根据更新类型决定是否发送消息
             match processor.diff(full_screen) {
                 ScreenUpdate::Full(full_screen) => {
-                    info!(
-                        "Sending full screen update to device {} ({} bytes)",
-                        device_info.device_id,
-                        full_screen.data.len()
-                    );
+                    info!("Full screen update -> {}", device_info.device_id);
                     let msg = Message::FullScreenUpdate(full_screen);
 
                     let devices_guard = devices.read().await;
@@ -101,10 +97,7 @@ pub(crate) async fn start_screen_refresh(
                     })?;
                 }
                 ScreenUpdate::Incremental(incremental) => {
-                    info!(
-                        "Sending incremental screen update to device {}",
-                        device_info.device_id
-                    );
+                    info!("Incremental update -> {}", device_info.device_id);
                     let msg = Message::IncrementalScreenUpdate(incremental);
 
                     let devices_guard = devices.read().await;

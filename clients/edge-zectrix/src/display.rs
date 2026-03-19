@@ -69,7 +69,7 @@ pub fn init_display(
 pub fn full_screen_update(data: &[u8]) -> Result<()> {
     critical_section::with(|cs| {
         if let Some(mut display) = DISPLAY.borrow(cs).take() {
-            info!("Starting full screen update");
+            info!("Full screen update");
 
             // 初始化显示屏
             if let Err(e) = display.normal_init() {
@@ -99,7 +99,6 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
                 return Err(anyhow::anyhow!("Display deep sleep failed"));
             }
 
-            info!("Full screen update completed");
             DISPLAY.borrow(cs).replace(Some(display));
             Ok(())
         } else {
@@ -115,15 +114,18 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
     critical_section::with(|cs| {
         if let Some(mut display) = DISPLAY.borrow(cs).take() {
             info!(
-                "Starting incremental screen update with {} regions",
+                "Incremental update: {} region(s)",
                 regions.len()
             );
 
             // 对每个区域执行部分写入
             for (i, region) in regions.iter().enumerate() {
+                // 转换Y坐标：我们的坐标系统是y=0在顶部，SSD1683是y=HEIGHT-1在顶部
+                let ssd1683_y = HEIGHT - region.y - region.height;
+
                 if let Err(e) = display.part_write(
                     region.x,
-                    region.y,
+                    ssd1683_y,
                     region.width,
                     region.height,
                     &region.data,
@@ -141,7 +143,6 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
                 return Err(anyhow::anyhow!("Display part update failed"));
             }
 
-            info!("Incremental screen update completed");
             DISPLAY.borrow(cs).replace(Some(display));
             Ok(())
         } else {
