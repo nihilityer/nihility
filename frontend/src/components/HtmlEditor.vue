@@ -34,18 +34,12 @@
 <script lang="ts" setup>
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {Moon, Sunny} from '@element-plus/icons-vue'
-import {EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightActiveLine} from '@codemirror/view'
-import {EditorState, Compartment} from '@codemirror/state'
+import {EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers} from '@codemirror/view'
+import {Compartment, EditorState} from '@codemirror/state'
 import {defaultKeymap, history, historyKeymap} from '@codemirror/commands'
 import {html} from '@codemirror/lang-html'
 import {autocompletion, closeBrackets, closeBracketsKeymap} from '@codemirror/autocomplete'
-import {
-  foldGutter,
-  foldKeymap,
-  indentOnInput,
-  syntaxHighlighting,
-  defaultHighlightStyle
-} from '@codemirror/language'
+import {defaultHighlightStyle, foldGutter, foldKeymap, indentOnInput, syntaxHighlighting} from '@codemirror/language'
 import {oneDark} from '@codemirror/theme-one-dark'
 import {searchKeymap} from '@codemirror/search'
 
@@ -189,6 +183,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   overflow: hidden;
+  width: 100%;
 }
 
 .editor-toolbar {
