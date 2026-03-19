@@ -16,7 +16,7 @@ use edge_nal_embassy::{Tcp, TcpBuffers};
 use edge_ws::{FrameHeader, FrameType};
 use embassy_net::Stack;
 use embedded_io_async::{Read, Write};
-use log::info;
+use log::{error, info, warn};
 use nihility_edge_protocol::Message;
 
 pub async fn run_ws_server(stack: Stack<'_>) -> Result<()> {
@@ -99,6 +99,7 @@ impl Handler for WsHandler {
             let mut buf = Vec::with_capacity_in(40960, esp_alloc::ExternalMemory);
             buf.resize(40960, 0);
 
+            let mut timestamp: u64 = 0;
             loop {
                 let header = FrameHeader::recv(&mut socket)
                     .await
@@ -121,19 +122,35 @@ impl Handler for WsHandler {
                             Ok(msg) => {
                                 match msg {
                                     Message::FullScreenUpdate(screen_data) => {
+                                        if screen_data.timestamp < timestamp {
+                                            warn!(
+                                                "new screen data timestamp is less than timestamp"
+                                            );
+                                            continue;
+                                        }
+                                        timestamp = screen_data.timestamp;
                                         // 执行全量屏幕更新
                                         if let Err(e) = full_screen_update(&screen_data.data) {
                                             info!("Failed to update screen: {:?}", e);
                                         }
                                     }
                                     Message::IncrementalScreenUpdate(screen_data) => {
+                                        if screen_data.timestamp < timestamp {
+                                            warn!(
+                                                "new screen data timestamp is less than timestamp"
+                                            );
+                                            continue;
+                                        }
+                                        timestamp = screen_data.timestamp;
                                         // 执行增量屏幕更新
-                                        if let Err(e) = incremental_screen_update(&screen_data.regions) {
+                                        if let Err(e) =
+                                            incremental_screen_update(&screen_data.regions)
+                                        {
                                             info!("Failed to update screen incrementally: {:?}", e);
                                         }
                                     }
-                                    Message::KeyEvent(key_event) => {
-                                        info!("Received key event: {:?}", key_event);
+                                    _ => {
+                                        error!("unhandled message: {:?}", msg);
                                     }
                                 }
                             }

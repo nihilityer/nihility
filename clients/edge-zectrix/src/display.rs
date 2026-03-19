@@ -15,6 +15,7 @@ use ssd1683::{DeepSleepMode, Display, Interface};
 
 const WIDTH: u16 = 400;
 const HEIGHT: u16 = 300;
+const MAX_FAST_UPDATES: usize = 10;
 
 static DISPLAY: Mutex<
     Cell<
@@ -29,6 +30,8 @@ static DISPLAY: Mutex<
         >,
     >,
 > = Mutex::new(Cell::new(None));
+
+static UPDATE_COUNT: Mutex<Cell<usize>> = Mutex::new(Cell::new(0));
 
 pub fn init_display(
     busy: GPIO4<'static>,
@@ -65,17 +68,26 @@ pub fn init_display(
 }
 
 /// 全量屏幕更新
-/// 基于 SSD1683 示例的 normal_init -> write_all -> normal_update -> deep_sleep 流程
 pub fn full_screen_update(data: &[u8]) -> Result<()> {
     critical_section::with(|cs| {
+        let mut count = UPDATE_COUNT.borrow(cs).take();
         if let Some(mut display) = DISPLAY.borrow(cs).take() {
-            info!("Full screen update");
-
-            // 初始化显示屏
-            if let Err(e) = display.normal_init() {
-                error!("Failed to init display: {:?}", e);
-                DISPLAY.borrow(cs).replace(Some(display));
-                return Err(anyhow::anyhow!("Display init failed"));
+            if count == 0 || count > MAX_FAST_UPDATES {
+                info!("normal full screen update");
+                // 初始化显示屏
+                if let Err(e) = display.normal_init() {
+                    error!("Failed to normal init display: {:?}", e);
+                    DISPLAY.borrow(cs).replace(Some(display));
+                    return Err(anyhow::anyhow!("Display init failed"));
+                }
+            } else {
+                info!("fast full screen update");
+                // 快速刷新初始化
+                if let Err(e) = display.fast_init(false) {
+                    error!("Failed to fast init display: {:?}", e);
+                    DISPLAY.borrow(cs).replace(Some(display));
+                    return Err(anyhow::anyhow!("Display init failed"));
+                }
             }
 
             // 写入完整屏幕数据
@@ -85,12 +97,24 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
                 return Err(anyhow::anyhow!("Display write failed"));
             }
 
-            // 执行正常更新
-            if let Err(e) = display.normal_update() {
-                error!("Failed to update display: {:?}", e);
-                DISPLAY.borrow(cs).replace(Some(display));
-                return Err(anyhow::anyhow!("Display update failed"));
+            if count == 0 || count > MAX_FAST_UPDATES {
+                count = 1;
+                // 执行正常更新
+                if let Err(e) = display.normal_update() {
+                    error!("Failed to normal update display: {:?}", e);
+                    DISPLAY.borrow(cs).replace(Some(display));
+                    return Err(anyhow::anyhow!("Display update failed"));
+                }
+            } else {
+                count += 1;
+                // 快速刷新
+                if let Err(e) = display.fast_update() {
+                    error!("Failed to fast update display: {:?}", e);
+                    DISPLAY.borrow(cs).replace(Some(display));
+                    return Err(anyhow::anyhow!("Display update failed"));
+                }
             }
+            UPDATE_COUNT.borrow(cs).set(count);
 
             // 进入深度睡眠以节省电量，保留 RAM 内容
             if let Err(e) = display.deep_sleep(DeepSleepMode::PreserveRAM) {
@@ -113,14 +137,11 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
 pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
     critical_section::with(|cs| {
         if let Some(mut display) = DISPLAY.borrow(cs).take() {
-            info!(
-                "Incremental update: {} region(s)",
-                regions.len()
-            );
+            info!("Incremental update: {} region(s)", regions.len());
 
             // 对每个区域执行部分写入
             for (i, region) in regions.iter().enumerate() {
-                // 转换Y坐标：我们的坐标系统是y=0在顶部，SSD1683是y=HEIGHT-1在顶部
+                // 转换Y坐标
                 let ssd1683_y = HEIGHT - region.y - region.height;
 
                 if let Err(e) = display.part_write(
@@ -153,7 +174,6 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
 }
 
 /// 初始化显示屏并清空屏幕（显示全白）
-/// 基于 SSD1683 示例的初始化流程
 pub fn init_and_clear_screen() -> Result<()> {
     const BUFFER_SIZE: usize = (WIDTH as usize * HEIGHT as usize) / 8;
     let buffer = [0xFF_u8; BUFFER_SIZE]; // 全白

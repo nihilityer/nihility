@@ -18,11 +18,12 @@ pub enum ScreenUpdate {
     Skip,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ScreenProcessor {
     width: u16,
     height: u16,
     last_frame: Option<Vec<u8>>,
+    last_timestamp: u64,
     screen_config: ScreenConfig,
 }
 
@@ -33,6 +34,10 @@ impl ScreenProcessor {
             width,
             height,
             last_frame: None,
+            last_timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
             screen_config,
         }
     }
@@ -43,11 +48,15 @@ impl ScreenProcessor {
         let img = image::load_from_memory(png_data)?;
 
         // 2. 缩放到目标尺寸
-        let resized = img.resize_exact(
-            self.width as u32,
-            self.height as u32,
-            image::imageops::FilterType::Lanczos3,
-        );
+        let resized = if img.width() != self.width as u32 || img.height() != self.height as u32 {
+            img.resize_exact(
+                self.width as u32,
+                self.height as u32,
+                image::imageops::FilterType::Nearest,
+            )
+        } else {
+            img
+        };
 
         // 3. 转换为灰度
         let gray = resized.to_luma8();
@@ -76,8 +85,8 @@ impl ScreenProcessor {
                 let (src_x, src_y) = self.transform_coordinates(x, y);
                 let pixel = gray.get_pixel(src_x as u32, src_y as u32)[0];
 
-                // 阈值二值化（亮度 >= 128 为白色/1，否则黑色/0）
-                if pixel >= 128 {
+                // 阈值二值化
+                if pixel >= 170 {
                     let bit_index = (y as usize * self.width as usize) + x as usize;
                     let byte_index = bit_index / 8;
                     let bit_offset = 7 - (bit_index % 8); // 高位在前
@@ -117,22 +126,31 @@ impl ScreenProcessor {
 
     /// 比较两帧，确定更新类型
     pub fn diff(&mut self, new_frame: FullScreenData) -> ScreenUpdate {
-        let Some(ref last_frame) = self.last_frame else {
+        if self.last_timestamp > new_frame.timestamp {
+            return ScreenUpdate::Skip;
+        } else {
+            self.last_timestamp = new_frame.timestamp;
+        }
+        // 获取上一帧数据（克隆以避免借用冲突）
+        let Some(last_frame) = self.last_frame.clone() else {
             // 首次推送，使用全量更新
             self.last_frame = Some(new_frame.data.clone());
             return ScreenUpdate::Full(new_frame);
         };
 
         // 计算变化像素数
-        let changed_pixels = self.count_changed_pixels(last_frame, &new_frame.data);
-        let total_pixels = self.width as usize * self.height as usize;
+        let changed_pixels = self.count_changed_pixels(&last_frame, &new_frame.data);
 
         // 没有像素更新时不发送任何消息
         if changed_pixels == 0 {
             return ScreenUpdate::Skip;
         }
 
+        let total_pixels = self.width as usize * self.height as usize;
         let change_percent = (changed_pixels * 100) / total_pixels;
+
+        // 更新帧缓存（在返回前统一更新）
+        self.last_frame = Some(new_frame.data.clone());
 
         // 如果变化超过 50%，使用全量更新
         if change_percent > 50 {
@@ -141,9 +159,7 @@ impl ScreenProcessor {
         }
 
         // 生成合并后的单一更新区域
-        let regions = self.generate_merged_region(last_frame, &new_frame.data);
-
-        self.last_frame = Some(new_frame.data.clone());
+        let regions = self.generate_merged_region(&last_frame, &new_frame.data);
 
         ScreenUpdate::Incremental(IncrementalScreenData {
             regions,
@@ -191,7 +207,6 @@ impl ScreenProcessor {
         }
 
         // 计算边界矩形的宽高
-        let width = max_x - min_x + 1;
         let height = max_y - min_y + 1;
 
         // 确保宽度是8的倍数（对于1-bit位图的字节对齐）
