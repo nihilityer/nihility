@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-use crate::display::init_display;
+use crate::display::{init_and_clear_screen, init_display};
 use crate::net::mdns::start_mdns;
 use crate::net::wifi::{dhcp_task, net_task, run_ap_mode, run_client_mode, AP_SSID, GW_IP};
 use crate::net::{get_device_id, MAX_RETRY_COUNT};
@@ -50,6 +50,9 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         peripherals.GPIO12,
         peripherals.GPIO11,
     )?;
+
+    // 初始化并清空屏幕（显示全白）
+    init_and_clear_screen()?;
 
     let credentials = load_credentials()?;
 

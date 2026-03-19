@@ -1,3 +1,4 @@
+use crate::display::{full_screen_update, incremental_screen_update};
 use crate::net::SERVICE_PORT;
 use alloc::boxed::Box;
 use alloc::format;
@@ -128,14 +129,20 @@ impl Handler for WsHandler {
                                             screen_data.height,
                                             screen_data.data.len()
                                         );
-                                        // TODO: 实际的屏幕渲染逻辑
+                                        // 执行全量屏幕更新
+                                        if let Err(e) = full_screen_update(&screen_data.data) {
+                                            info!("Failed to update screen: {:?}", e);
+                                        }
                                     }
                                     Message::IncrementalScreenUpdate(screen_data) => {
                                         info!(
                                             "Received incremental screen update: {} regions",
                                             screen_data.regions.len()
                                         );
-                                        // TODO: 实际的增量屏幕更新逻辑
+                                        // 执行增量屏幕更新
+                                        if let Err(e) = incremental_screen_update(&screen_data.regions) {
+                                            info!("Failed to update screen incrementally: {:?}", e);
+                                        }
                                     }
                                     Message::KeyEvent(key_event) => {
                                         info!("Received key event: {:?}", key_event);
