@@ -190,10 +190,10 @@ const handleCreate = () => {
   selectedPageDetail.value = null
   isCreateMode.value = true
   formData.value = {
-    path: '/new',
+    path: '',
     html: '<!DOCTYPE html>\n<html>\n<head>\n  <title>New Page</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n</body>\n</html>',
   }
-  testPath.value = '/new'
+  testPath.value = ''
   activeTab.value = 'editor'
 }
 
