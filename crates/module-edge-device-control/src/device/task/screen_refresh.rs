@@ -23,8 +23,7 @@ pub(crate) async fn start_screen_refresh(
     ));
     info!(
         "Screen refresh task started for device {} (interval: {}ms)",
-        device_info.device_id,
-        device_info.screen_refresh_interval
+        device_info.device_id, device_info.screen_refresh_interval
     );
 
     let mut processor = ScreenProcessor::new(

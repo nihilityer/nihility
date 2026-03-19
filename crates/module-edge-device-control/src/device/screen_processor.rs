@@ -3,6 +3,7 @@
 //! 集成了屏幕转换和差异检测功能
 
 use crate::error::*;
+use image::{DynamicImage, GenericImageView};
 use nihility_edge_protocol::{
     FullScreenData, IncrementalScreenData, ScreenConfig, ScreenRotation, UpdateRegion,
 };
@@ -24,6 +25,7 @@ pub struct ScreenProcessor {
     height: u16,
     last_frame: Option<Vec<u8>>,
     last_timestamp: u64,
+    part_update_count: usize,
     screen_config: ScreenConfig,
 }
 
@@ -38,6 +40,7 @@ impl ScreenProcessor {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
+            part_update_count: 0,
             screen_config,
         }
     }
@@ -59,7 +62,7 @@ impl ScreenProcessor {
         };
 
         // 3. 转换为灰度
-        let gray = resized.to_luma8();
+        let gray = resized.grayscale();
 
         // 4. 二值化（阈值 128）
         let bitmap = self.binarize(&gray);
@@ -76,7 +79,7 @@ impl ScreenProcessor {
     }
 
     /// 灰度图 → 1-bit 位图
-    fn binarize(&self, gray: &image::GrayImage) -> Vec<u8> {
+    fn binarize(&self, gray: &DynamicImage) -> Vec<u8> {
         let mut bitmap = vec![0u8; Self::expected_size(self.width as usize, self.height as usize)];
 
         for y in 0..self.height {
@@ -86,7 +89,7 @@ impl ScreenProcessor {
                 let pixel = gray.get_pixel(src_x as u32, src_y as u32)[0];
 
                 // 阈值二值化
-                if pixel >= 170 {
+                if pixel >= 175 {
                     let bit_index = (y as usize * self.width as usize) + x as usize;
                     let byte_index = bit_index / 8;
                     let bit_offset = 7 - (bit_index % 8); // 高位在前
@@ -144,6 +147,14 @@ impl ScreenProcessor {
         // 没有像素更新时不发送任何消息
         if changed_pixels == 0 {
             return ScreenUpdate::Skip;
+        }
+
+        if self.part_update_count > 5 {
+            self.part_update_count = 0;
+            self.last_frame = Some(new_frame.data.clone());
+            return ScreenUpdate::Full(new_frame);
+        } else {
+            self.part_update_count += 1;
         }
 
         let total_pixels = self.width as usize * self.height as usize;
