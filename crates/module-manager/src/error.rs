@@ -11,6 +11,9 @@ pub enum ModuleManagerError {
     #[error(transparent)]
     EdgeDeviceControl(#[from] nihility_module_edge_device_control::error::EdgeDeviceControlError),
 
+    #[error(transparent)]
+    Model(#[from] nihility_module_model::error::ModelError),
+
     #[error("Module not found: {0:?}")]
     ModuleNotFound(crate::ModuleType),
 

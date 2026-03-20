@@ -19,6 +19,7 @@ pub enum ModuleType {
 pub enum EmbedModule {
     BrowserControl,
     EdgeDeviceControl,
+    Model,
 }
 
 /// 模块功能列表
@@ -79,6 +80,12 @@ impl ModuleManager {
                                 ModuleType::Embed(embed_module),
                                 Arc::new(RwLock::new(module)),
                             );
+                        }
+                        EmbedModule::Model => {
+                            let module = Arc::new(RwLock::new(
+                                nihility_module_model::ModelModule::init_from_file_config().await?,
+                            ));
+                            modules.insert(ModuleType::Embed(embed_module), module);
                         }
                     }
                 }
@@ -196,6 +203,7 @@ impl ModuleManagerConfig {
         embeds.sort_by_key(|embed| match embed {
             EmbedModule::BrowserControl => 0,
             EmbedModule::EdgeDeviceControl => 1,
+            EmbedModule::Model => 2,
         });
 
         let mut enable_modules = Vec::with_capacity(embeds.len() + wasms.len());
@@ -214,6 +222,7 @@ impl Serialize for EmbedModule {
         let s = match self {
             EmbedModule::BrowserControl => "browser-control",
             EmbedModule::EdgeDeviceControl => "edge-device-control",
+            EmbedModule::Model => "model",
         };
         serializer.serialize_str(s)
     }
@@ -228,6 +237,7 @@ impl<'de> Deserialize<'de> for EmbedModule {
         match s.as_str() {
             "browser-control" => Ok(EmbedModule::BrowserControl),
             "edge-device-control" => Ok(EmbedModule::EdgeDeviceControl),
+            "model" => Ok(EmbedModule::Model),
             _ => Err(serde::de::Error::custom(format!(
                 "unknown embed module: {}",
                 s
@@ -246,6 +256,7 @@ impl Serialize for ModuleType {
                 let embed_str = match embed {
                     EmbedModule::BrowserControl => "browser-control",
                     EmbedModule::EdgeDeviceControl => "edge-device-control",
+                    EmbedModule::Model => "model",
                 };
                 format!("embed-{}", embed_str)
             }
@@ -266,6 +277,7 @@ impl<'de> Deserialize<'de> for ModuleType {
             match embed_name {
                 "browser-control" => Ok(ModuleType::Embed(EmbedModule::BrowserControl)),
                 "edge-device-control" => Ok(ModuleType::Embed(EmbedModule::EdgeDeviceControl)),
+                "model" => Ok(ModuleType::Embed(EmbedModule::Model)),
                 _ => Err(serde::de::Error::custom(format!(
                     "unknown embed module: {}",
                     embed_name
