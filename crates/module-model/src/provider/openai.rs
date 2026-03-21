@@ -4,12 +4,12 @@ use crate::provider::{BoxStream, ModelProvider};
 use crate::utils::pcm_to_wav;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::audio::{AudioInput, CreateTranscriptionRequestArgs};
-use async_openai::types::InputSource;
 use async_openai::types::chat::{
     ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
     ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, ImageUrl, Prompt,
 };
 use async_openai::types::completions::CreateCompletionRequestArgs;
+use async_openai::types::InputSource;
 use async_openai::Client;
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -45,15 +45,9 @@ impl ModelProvider for OpenAiProvider {
             .model(&self.model)
             .prompt(Prompt::String(prompt.to_string()))
             .stream(false)
-            .build()
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+            .build()?;
 
-        let response = self
-            .client
-            .completions()
-            .create(request)
-            .await
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+        let response = self.client.completions().create(request).await?;
 
         let content = response
             .choices
@@ -70,15 +64,9 @@ impl ModelProvider for OpenAiProvider {
             .model(&self.model)
             .prompt(Prompt::String(prompt.to_string()))
             .stream(true)
-            .build()
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+            .build()?;
 
-        let mut stream = self
-            .client
-            .completions()
-            .create_stream(request)
-            .await
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+        let mut stream = self.client.completions().create_stream(request).await?;
 
         let (tx, rx) = mpsc::channel::<Result<String>>(32);
 
@@ -92,7 +80,7 @@ impl ModelProvider for OpenAiProvider {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.send(Err(ModelError::ApiRequest(e.to_string()))).await;
+                        let _ = tx.send(Err(ModelError::ApiRequest(e))).await;
                         break;
                     }
                 }
@@ -115,19 +103,12 @@ impl ModelProvider for OpenAiProvider {
                     })
                     .into(),
                 ])
-                .build()
-                .map_err(|e| ModelError::ApiRequest(e.to_string()))?
+                .build()?
                 .into()])
             .stream(false)
-            .build()
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+            .build()?;
 
-        let response = self
-            .client
-            .chat()
-            .create(request)
-            .await
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+        let response = self.client.chat().create(request).await?;
 
         let content = response
             .choices
@@ -156,19 +137,12 @@ impl ModelProvider for OpenAiProvider {
                     })
                     .into(),
                 ])
-                .build()
-                .map_err(|e| ModelError::ApiRequest(e.to_string()))?
+                .build()?
                 .into()])
             .stream(true)
-            .build()
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+            .build()?;
 
-        let mut stream = self
-            .client
-            .chat()
-            .create_stream(request)
-            .await
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+        let mut stream = self.client.chat().create_stream(request).await?;
 
         let (tx, rx) = mpsc::channel::<Result<String>>(32);
 
@@ -184,7 +158,7 @@ impl ModelProvider for OpenAiProvider {
                         }
                     }
                     Err(e) => {
-                        let _ = tx.send(Err(ModelError::ApiRequest(e.to_string()))).await;
+                        let _ = tx.send(Err(ModelError::ApiRequest(e))).await;
                         break;
                     }
                 }
@@ -214,16 +188,9 @@ impl ModelProvider for OpenAiProvider {
                     vec: wav_data,
                 },
             })
-            .build()
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+            .build()?;
 
-        let response = self
-            .client
-            .audio()
-            .transcription()
-            .create(request)
-            .await
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+        let response = self.client.audio().transcription().create(request).await?;
 
         Ok(response.text)
     }

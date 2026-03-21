@@ -23,7 +23,7 @@ pub trait ModelProvider: Send + Sync {
     /// 文本补全流式响应
     async fn text_completion_stream(&self, prompt: &str) -> Result<BoxStream<String>> {
         debug!("text_completion_stream: {}", prompt);
-        Err(ModelError::Streaming(
+        Err(ModelError::Unsupported(
             "text_completion_stream is not supported".to_string(),
         ))
     }
@@ -49,7 +49,7 @@ pub trait ModelProvider: Send + Sync {
             "image_understanding_stream: image_url: {}, prompt: {}",
             image_url, prompt
         );
-        Err(ModelError::Streaming(
+        Err(ModelError::Unsupported(
             "image_understanding_stream is not supported".to_string(),
         ))
     }

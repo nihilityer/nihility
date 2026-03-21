@@ -18,8 +18,7 @@ pub fn pcm_to_wav(
 
     let mut buffer = Vec::new();
     {
-        let mut writer = WavWriter::new(Cursor::new(&mut buffer), spec)
-            .map_err(|e| ModelError::AudioEncode(e.to_string()))?;
+        let mut writer = WavWriter::new(Cursor::new(&mut buffer), spec)?;
 
         // 根据位深处理 PCM 数据
         match bits_per_sample {
@@ -27,9 +26,7 @@ pub fn pcm_to_wav(
                 // 8-bit PCM: unsigned, 0-255 -> 转换为 signed i8: -128 to 127
                 for &byte in pcm_data {
                     let sample = (byte as i8).wrapping_sub(-128i8);
-                    writer
-                        .write_sample(sample)
-                        .map_err(|e| ModelError::AudioEncode(e.to_string()))?;
+                    writer.write_sample(sample)?;
                 }
             }
             16 => {
@@ -37,9 +34,7 @@ pub fn pcm_to_wav(
                 for chunk in pcm_data.chunks(2) {
                     if chunk.len() == 2 {
                         let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
-                        writer
-                            .write_sample(sample)
-                            .map_err(|e| ModelError::AudioEncode(e.to_string()))?;
+                        writer.write_sample(sample)?;
                     }
                 }
             }
@@ -48,9 +43,7 @@ pub fn pcm_to_wav(
                 for chunk in pcm_data.chunks(3) {
                     if chunk.len() == 3 {
                         let sample = i32::from_le_bytes([chunk[0], chunk[1], chunk[2], 0]);
-                        writer
-                            .write_sample(sample)
-                            .map_err(|e| ModelError::AudioEncode(e.to_string()))?;
+                        writer.write_sample(sample)?;
                     }
                 }
             }
@@ -59,9 +52,7 @@ pub fn pcm_to_wav(
                 for chunk in pcm_data.chunks(4) {
                     if chunk.len() == 4 {
                         let sample = i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                        writer
-                            .write_sample(sample)
-                            .map_err(|e| ModelError::AudioEncode(e.to_string()))?;
+                        writer.write_sample(sample)?;
                     }
                 }
             }
@@ -73,9 +64,7 @@ pub fn pcm_to_wav(
             }
         }
 
-        writer
-            .finalize()
-            .map_err(|e| ModelError::AudioEncode(e.to_string()))?;
+        writer.finalize()?;
     }
 
     Ok(buffer)
