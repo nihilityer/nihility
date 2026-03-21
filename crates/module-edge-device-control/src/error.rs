@@ -17,11 +17,11 @@ pub enum EdgeDeviceControlError {
     #[error(transparent)]
     Image(#[from] image::ImageError),
 
+    #[error(transparent)]
+    BrowserControl(#[from] nihility_module_browser_control::error::BrowserControlError),
+
     #[error("Serialization error: {0}")]
     Serialization(String),
-
-    #[error("Browser control error: {0}")]
-    BrowserControl(#[from] nihility_module_browser_control::error::BrowserControlError),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
