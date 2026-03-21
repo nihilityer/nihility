@@ -32,7 +32,7 @@ impl Callable for ModelModule {
             }
             "speech_recognition" => {
                 let param = serde_json::from_value::<SpeechRecognitionParam>(param)?;
-                let result = self.speech_recognition(&param).await?;
+                let result = self.speech_recognition(param).await?;
                 Ok(serde_json::to_value(result)?)
             }
             _ => Err(anyhow::anyhow!("Unsupported func_name: {}", func_name)),

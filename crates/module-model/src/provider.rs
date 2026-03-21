@@ -55,10 +55,18 @@ pub trait ModelProvider: Send + Sync {
     }
 
     /// 语音识别
-    async fn speech_recognition(&self, audio_data: &[u8], format: &str) -> Result<String> {
+    async fn speech_recognition(
+        &self,
+        audio_data: &[u8],
+        sample_rate: u32,
+        channels: u8,
+        bits_per_sample: u8,
+    ) -> Result<String> {
         debug!(
-            "speech_recognition: format: {}, data_len: {}",
-            format,
+            "speech_recognition: sample_rate: {}, channels: {}, bits_per_sample: {}, data_len: {}",
+            sample_rate,
+            channels,
+            bits_per_sample,
             audio_data.len()
         );
         Err(ModelError::Unsupported(
@@ -74,7 +82,7 @@ impl ProviderFactory {
     pub fn create(provider_type: &ProviderType) -> Result<Box<dyn ModelProvider>> {
         match provider_type {
             ProviderType::OpenAI(config) => Ok(Box::new(openai::OpenAiProvider::new(config)?)),
-            ProviderType::Embed(_) => Err(crate::error::ModelError::Provider(
+            ProviderType::Embed(_) => Err(ModelError::Provider(
                 "Embed provider not implemented yet".to_string(),
             )),
         }

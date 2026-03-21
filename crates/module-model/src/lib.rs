@@ -3,6 +3,7 @@ pub mod error;
 pub mod func;
 pub mod pool;
 pub mod provider;
+mod utils;
 
 use config::ModelConfig;
 use error::Result;

@@ -31,4 +31,7 @@ pub enum ModelError {
 
     #[error("Audio decode error: {0}")]
     AudioDecode(String),
+
+    #[error("Audio encode error: {0}")]
+    AudioEncode(String),
 }

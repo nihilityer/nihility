@@ -1,7 +1,10 @@
 use crate::config::OpenAIConfig as ProviderConfig;
 use crate::error::{ModelError, Result};
 use crate::provider::{BoxStream, ModelProvider};
+use crate::utils::pcm_to_wav;
 use async_openai::config::OpenAIConfig;
+use async_openai::types::audio::{AudioInput, CreateTranscriptionRequestArgs};
+use async_openai::types::InputSource;
 use async_openai::types::chat::{
     ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
     ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, ImageUrl, Prompt,
@@ -62,43 +65,6 @@ impl ModelProvider for OpenAiProvider {
         Ok(content)
     }
 
-    async fn image_understanding(&self, image_url: &str, prompt: &str) -> Result<String> {
-        let request = CreateChatCompletionRequestArgs::default()
-            .model(&self.model)
-            .messages([ChatCompletionRequestUserMessageArgs::default()
-                .content(vec![
-                    ChatCompletionRequestMessageContentPartText::from(prompt).into(),
-                    ChatCompletionRequestMessageContentPartImage::from(ImageUrl {
-                        url: image_url.to_string(),
-                        detail: None,
-                    })
-                    .into(),
-                ])
-                .build()
-                .map_err(|e| ModelError::ApiRequest(e.to_string()))?
-                .into()])
-            .stream(false)
-            .build()
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
-
-        let response = self
-            .client
-            .chat()
-            .create(request)
-            .await
-            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
-
-        let content = response
-            .choices
-            .first()
-            .map(|c| c.message.clone())
-            .map(|m| m.content)
-            .unwrap_or(Some(String::default()))
-            .unwrap_or(String::default());
-
-        Ok(content)
-    }
-
     async fn text_completion_stream(&self, prompt: &str) -> Result<BoxStream<String>> {
         let request = CreateCompletionRequestArgs::default()
             .model(&self.model)
@@ -135,6 +101,43 @@ impl ModelProvider for OpenAiProvider {
 
         let boxed: BoxStream<String> = Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx));
         Ok(boxed)
+    }
+
+    async fn image_understanding(&self, image_url: &str, prompt: &str) -> Result<String> {
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(&self.model)
+            .messages([ChatCompletionRequestUserMessageArgs::default()
+                .content(vec![
+                    ChatCompletionRequestMessageContentPartText::from(prompt).into(),
+                    ChatCompletionRequestMessageContentPartImage::from(ImageUrl {
+                        url: image_url.to_string(),
+                        detail: None,
+                    })
+                    .into(),
+                ])
+                .build()
+                .map_err(|e| ModelError::ApiRequest(e.to_string()))?
+                .into()])
+            .stream(false)
+            .build()
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+
+        let response = self
+            .client
+            .chat()
+            .create(request)
+            .await
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+
+        let content = response
+            .choices
+            .first()
+            .map(|c| c.message.clone())
+            .map(|m| m.content)
+            .unwrap_or(Some(String::default()))
+            .unwrap_or(String::default());
+
+        Ok(content)
     }
 
     async fn image_understanding_stream(
@@ -190,5 +193,38 @@ impl ModelProvider for OpenAiProvider {
 
         let boxed: BoxStream<String> = Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx));
         Ok(boxed)
+    }
+
+    async fn speech_recognition(
+        &self,
+        audio_data: &[u8],
+        sample_rate: u32,
+        channels: u8,
+        bits_per_sample: u8,
+    ) -> Result<String> {
+        // 将 PCM 数据转换为 WAV 格式
+        let wav_data = pcm_to_wav(audio_data, sample_rate, channels, bits_per_sample)?;
+
+        // 使用 async_openai 库的 Whisper API
+        let request = CreateTranscriptionRequestArgs::default()
+            .model(&self.model)
+            .file(AudioInput {
+                source: InputSource::VecU8 {
+                    filename: "audio.wav".to_string(),
+                    vec: wav_data,
+                },
+            })
+            .build()
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+
+        let response = self
+            .client
+            .audio()
+            .transcription()
+            .create(request)
+            .await
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+
+        Ok(response.text)
     }
 }
