@@ -1,22 +1,25 @@
-use crate::config::OpenAIConfig;
-use crate::error::Result;
+use crate::config::OpenAIConfig as ProviderConfig;
+use crate::error::{ModelError, Result};
 use crate::provider::ModelProvider;
-use async_openai::config::OpenAIConfig as AsyncOpenAIConfig;
-use async_openai::types::chat::Prompt;
+use async_openai::config::OpenAIConfig;
+use async_openai::types::chat::{
+    ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
+    ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, ImageUrl, Prompt,
+};
 use async_openai::types::completions::CreateCompletionRequestArgs;
 use async_openai::Client;
 use async_trait::async_trait;
 use std::sync::Arc;
 
-/// OpenAI Provider 实现
+/// OpenAI API Provider 实现
 pub struct OpenAiProvider {
     client: Client<Arc<dyn async_openai::config::Config>>,
     model: String,
 }
 
 impl OpenAiProvider {
-    pub fn new(config: &OpenAIConfig) -> Result<Self> {
-        let openai_config = AsyncOpenAIConfig::new()
+    pub fn new(config: &ProviderConfig) -> Result<Self> {
+        let openai_config = OpenAIConfig::new()
             .with_api_key(&config.api_key)
             .with_api_base(&config.base_url);
 
@@ -38,14 +41,14 @@ impl ModelProvider for OpenAiProvider {
             .prompt(Prompt::String(prompt.to_string()))
             .stream(false)
             .build()
-            .map_err(|e| crate::error::ModelError::ApiRequest(e.to_string()))?;
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
 
         let response = self
             .client
             .completions()
             .create(request)
             .await
-            .map_err(|e| crate::error::ModelError::ApiRequest(e.to_string()))?;
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
 
         let content = response
             .choices
@@ -57,25 +60,40 @@ impl ModelProvider for OpenAiProvider {
         Ok(content)
     }
 
-    async fn image_understanding(
-        &self,
-        _image_url: &str,
-        _prompt: &str,
-    ) -> Result<String> {
-        // 暂时不支持图片理解，返回错误
-        Err(crate::error::ModelError::Unsupported(
-            "image_understanding is not yet implemented".to_string(),
-        ))
-    }
+    async fn image_understanding(&self, image_url: &str, prompt: &str) -> Result<String> {
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(&self.model)
+            .messages([ChatCompletionRequestUserMessageArgs::default()
+                .content(vec![
+                    ChatCompletionRequestMessageContentPartText::from(prompt).into(),
+                    ChatCompletionRequestMessageContentPartImage::from(ImageUrl {
+                        url: image_url.to_string(),
+                        detail: None,
+                    })
+                    .into(),
+                ])
+                .build()
+                .map_err(|e| ModelError::ApiRequest(e.to_string()))?
+                .into()])
+            .stream(false)
+            .build()
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
 
-    async fn speech_recognition(
-        &self,
-        _audio_data: &[u8],
-        _format: &str,
-    ) -> Result<String> {
-        // 暂时不支持语音识别，返回错误
-        Err(crate::error::ModelError::Unsupported(
-            "speech_recognition is not yet implemented".to_string(),
-        ))
+        let response = self
+            .client
+            .chat()
+            .create(request)
+            .await
+            .map_err(|e| ModelError::ApiRequest(e.to_string()))?;
+
+        let content = response
+            .choices
+            .first()
+            .map(|c| c.message.clone())
+            .map(|m| m.content)
+            .unwrap_or(Some(String::default()))
+            .unwrap_or(String::default());
+
+        Ok(content)
     }
 }
