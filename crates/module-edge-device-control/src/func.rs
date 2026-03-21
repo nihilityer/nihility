@@ -1,5 +1,5 @@
 use crate::EdgeDeviceControl;
-use nihility_module::{Callable, FunctionMetadata, Module};
+use nihility_module::{BoxStream, Callable, FunctionMetadata, Module};
 use schemars::schema_for;
 use serde_json::Value;
 use tracing::debug;
@@ -41,6 +41,20 @@ impl Callable for EdgeDeviceControl {
             )?),
             _ => Err(anyhow::anyhow!("Unsupported func_name in call_mut")),
         }
+    }
+
+    async fn call_stream(
+        &self,
+        func_name: &str,
+        _param: Value,
+    ) -> anyhow::Result<BoxStream<Value>> {
+        debug!(
+            func_name = %func_name,
+            "EdgeDeviceControl does not support streaming"
+        );
+        Err(anyhow::anyhow!(
+            "EdgeDeviceControl does not support streaming"
+        ))
     }
 }
 

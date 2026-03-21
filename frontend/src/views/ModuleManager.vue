@@ -203,6 +203,7 @@ import {Grid} from '@element-plus/icons-vue'
 import {
   callModuleFunction,
   getLoadedModules,
+  streamModuleFunction,
   type ModuleFunctions,
   type ModuleType,
   queryModuleFunctions,
@@ -250,6 +251,14 @@ const handleModuleSelect = async (key: string) => {
   }
 }
 
+// 判断函数是否为流式函数
+const isStreamingFunction = (funcName: string): boolean => {
+  if (!functions.value) return false
+  const allFuncs = [...(functions.value.no_perm_func || []), ...(functions.value.perm_func || [])]
+  const func = allFuncs.find(f => f.name === funcName)
+  return func?.tags?.includes('streaming') || false
+}
+
 // 调用功能
 const callFunction = async (funcName: string, isMut: boolean) => {
   if (!selectedModule.value) {
@@ -285,17 +294,44 @@ const callFunction = async (funcName: string, isMut: boolean) => {
     }
   }
 
-  try {
-    const response = await callModuleFunction(selectedModule.value, {
+  // 检查是否为流式函数
+  if (isStreamingFunction(funcName)) {
+    // 流式调用
+    callResult.value = ''
+    activeTab.value = 'result'
+
+    const { abort } = streamModuleFunction(selectedModule.value, {
       func_name: funcName,
       param,
       is_mut: isMut,
+    }, {
+      onChunk: (content) => {
+        callResult.value += content
+      },
+      onDone: () => {
+        ElMessage.success('流式调用完成')
+      },
+      onError: (error) => {
+        ElMessage.error(`流式调用失败: ${error}`)
+      }
     })
-    callResult.value = JSON.stringify(response.data.result, null, 2)
-    activeTab.value = 'result'
-    ElMessage.success('调用成功')
-  } catch (error) {
-    ElMessage.error('调用失败')
+
+    // 保存 abort 函数以便后续可以取消
+    ;(window as any).__streamAbort = abort
+  } else {
+    // 普通调用
+    try {
+      const response = await callModuleFunction(selectedModule.value, {
+        func_name: funcName,
+        param,
+        is_mut: isMut,
+      })
+      callResult.value = JSON.stringify(response.data.result, null, 2)
+      activeTab.value = 'result'
+      ElMessage.success('调用成功')
+    } catch (error) {
+      ElMessage.error('调用失败')
+    }
   }
 }
 

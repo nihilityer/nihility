@@ -1,7 +1,7 @@
 pub mod error;
 
 use crate::error::*;
-use nihility_module::{FunctionMetadata, Module};
+use nihility_module::{BoxStream, FunctionMetadata, Module};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -167,6 +167,25 @@ impl ModuleManager {
         let mut module_guard = module.write().await;
         module_guard
             .call_mut(func_name, param)
+            .await
+            .map_err(ModuleManagerError::Anyhow)
+    }
+
+    /// 流式调用指定模块的指定方法
+    pub async fn stream_call(
+        &self,
+        module_type: &ModuleType,
+        func_name: &str,
+        param: Value,
+    ) -> Result<BoxStream<Value>> {
+        let module = self
+            .modules
+            .get(module_type)
+            .ok_or_else(|| ModuleManagerError::ModuleNotFound(module_type.clone()))?;
+
+        let module_guard = module.read().await;
+        module_guard
+            .call_stream(func_name, param)
             .await
             .map_err(ModuleManagerError::Anyhow)
     }

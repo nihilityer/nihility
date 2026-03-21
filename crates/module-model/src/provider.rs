@@ -1,9 +1,13 @@
 use crate::config::ProviderType;
 use crate::error::{ModelError, Result};
 use async_trait::async_trait;
+use futures::Stream;
+use std::pin::Pin;
 use tracing::debug;
 
 mod openai;
+
+pub type BoxStream<T> = Pin<Box<dyn Stream<Item = Result<T>> + Send + 'static>>;
 
 /// 模型 provider trait
 #[async_trait]
@@ -16,6 +20,14 @@ pub trait ModelProvider: Send + Sync {
         ))
     }
 
+    /// 文本补全流式响应
+    async fn text_completion_stream(&self, prompt: &str) -> Result<BoxStream<String>> {
+        debug!("text_completion_stream: {}", prompt);
+        Err(ModelError::Streaming(
+            "text_completion_stream is not supported".to_string(),
+        ))
+    }
+
     /// 图片理解
     async fn image_understanding(&self, image_url: &str, prompt: &str) -> Result<String> {
         debug!(
@@ -24,6 +36,21 @@ pub trait ModelProvider: Send + Sync {
         );
         Err(ModelError::Unsupported(
             "image_understanding is not supported".to_string(),
+        ))
+    }
+
+    /// 图片理解流式响应
+    async fn image_understanding_stream(
+        &self,
+        image_url: &str,
+        prompt: &str,
+    ) -> Result<BoxStream<String>> {
+        debug!(
+            "image_understanding_stream: image_url: {}, prompt: {}",
+            image_url, prompt
+        );
+        Err(ModelError::Streaming(
+            "image_understanding_stream is not supported".to_string(),
         ))
     }
 

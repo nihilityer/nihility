@@ -2,7 +2,7 @@ use crate::func::open_page::OpenPageParam;
 use crate::func::press_key::PressKeyParam;
 use crate::func::screenshot::ScreenshotParam;
 use crate::BrowserControl;
-use nihility_module::{Callable, FunctionMetadata, Module};
+use nihility_module::{BoxStream, Callable, FunctionMetadata, Module};
 use schemars::schema_for;
 use serde_json::Value;
 use tracing::debug;
@@ -42,6 +42,20 @@ impl Callable for BrowserControl {
             )?),
             _ => Err(anyhow::anyhow!("Unsupported func_name")),
         }
+    }
+
+    async fn call_stream(
+        &self,
+        func_name: &str,
+        _param: Value,
+    ) -> anyhow::Result<BoxStream<Value>> {
+        debug!(
+            func_name = %func_name,
+            "Browser control does not support streaming"
+        );
+        Err(anyhow::anyhow!(
+            "BrowserControl does not support streaming"
+        ))
     }
 }
 

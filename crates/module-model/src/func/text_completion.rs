@@ -1,6 +1,6 @@
 use crate::config::ModelCapability;
 use crate::error::Result;
-use crate::provider;
+use crate::provider::{BoxStream, ProviderFactory};
 use crate::ModelModule;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -12,13 +12,33 @@ pub struct TextCompletionParam {
     pub prompt: String,
 }
 
+/// 文本补全流式请求参数
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TextCompletionStreamParam {
+    /// 提示词
+    pub prompt: String,
+}
+
 impl ModelModule {
     /// 文本补全
     pub async fn text_completion(&self, param: &TextCompletionParam) -> Result<String> {
         self.pool
             .invoke(ModelCapability::TextCompletion, move |model| async move {
-                let provider = provider::ProviderFactory::create(&model.provider)?;
+                let provider = ProviderFactory::create(&model.provider)?;
                 provider.text_completion(&param.prompt).await
+            })
+            .await
+    }
+
+    /// 文本补全流式响应
+    pub async fn text_completion_stream(
+        &self,
+        param: &TextCompletionStreamParam,
+    ) -> Result<BoxStream<String>> {
+        self.pool
+            .invoke(ModelCapability::TextCompletion, move |model| async move {
+                let provider = ProviderFactory::create(&model.provider)?;
+                provider.text_completion_stream(&param.prompt).await
             })
             .await
     }

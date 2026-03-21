@@ -21,6 +21,8 @@ axum-extra = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+futures = { workspace = true }
+async-stream = { workspace = true }
 argon2 = { workspace = true }
 chrono = { workspace = true }
 jsonwebtoken = { workspace = true }
