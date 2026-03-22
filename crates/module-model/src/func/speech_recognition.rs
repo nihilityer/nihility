@@ -2,7 +2,6 @@ use crate::config::ModelCapability;
 use crate::ModelModule;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// 语音识别请求参数
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

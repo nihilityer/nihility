@@ -62,7 +62,7 @@ impl ModelPool {
             capability_index: RwLock::new(capability_index),
             round_robin_counter: AtomicUsize::new(0),
             load_balance: config.load_balance.clone(),
-            providers: tokio::sync::Mutex::new(HashMap::new()),
+            providers: Mutex::new(HashMap::new()),
         }
     }
 
@@ -197,10 +197,7 @@ impl ModelPool {
                     self.round_robin_counter.fetch_add(1, Ordering::SeqCst) % valid_indices.len()
                 }
                 LoadBalanceType::WeightedRandom => {
-                    let total_weight: u32 = valid_indices
-                        .iter()
-                        .map(|&i| models[i].weight())
-                        .sum();
+                    let total_weight: u32 = valid_indices.iter().map(|&i| models[i].weight()).sum();
                     if total_weight == 0 {
                         0usize
                     } else {
@@ -214,6 +211,14 @@ impl ModelPool {
         let mut errors = Vec::new();
         for offset in 0..valid_indices.len() {
             let idx = valid_indices[(start_offset + offset) % valid_indices.len()];
+
+            // 检查权重是否仍大于0（可能被其他请求在并发时改变）
+            {
+                let models = self.models.read().await;
+                if models[idx].weight() == 0 {
+                    continue;
+                }
+            }
 
             // 获取模型名称（用于错误信息）
             let model_name = {
