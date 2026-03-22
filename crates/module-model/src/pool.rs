@@ -1,4 +1,4 @@
-use crate::config::{LoadBalanceConfig, ModelCapability, ModelEntry};
+use crate::config::{LoadBalanceConfig, LoadBalanceType, ModelCapability, ModelEntry};
 use crate::error::{ModelError, Result};
 use crate::provider::{ModelProvider, ProviderFactory};
 use std::collections::HashMap;
@@ -187,8 +187,33 @@ impl ModelPool {
             }
 
             // 根据负载均衡策略选择
-            let idx = self.round_robin_counter.fetch_add(1, Ordering::SeqCst) % valid_indices.len();
-            valid_indices[idx]
+            match self.load_balance.strategy {
+                LoadBalanceType::WeightedRoundRobin => {
+                    let idx = self.round_robin_counter.fetch_add(1, Ordering::SeqCst) % valid_indices.len();
+                    valid_indices[idx]
+                }
+                LoadBalanceType::WeightedRandom => {
+                    // 计算总权重
+                    let total_weight: u32 = valid_indices
+                        .iter()
+                        .map(|&i| models[i].weight())
+                        .sum();
+
+                    // 加权随机选择
+                    let random_value = rand::random::<u32>() % total_weight;
+
+                    let mut cumulative = 0u32;
+                    let mut selected_idx = *valid_indices.last().unwrap();
+                    for &idx in &valid_indices {
+                        cumulative += models[idx].weight();
+                        if random_value < cumulative {
+                            selected_idx = idx;
+                            break;
+                        }
+                    }
+                    selected_idx
+                }
+            }
         };
 
         // 获取或创建 provider
