@@ -14,6 +14,9 @@ pub enum ModuleManagerError {
     #[error(transparent)]
     Model(#[from] nihility_module_model::error::ModelError),
 
+    #[error(transparent)]
+    Audio(#[from] nihility_module_audio::error::AudioError),
+
     #[error("Module not found: {0:?}")]
     ModuleNotFound(crate::ModuleType),
 

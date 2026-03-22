@@ -1,7 +1,5 @@
-use crate::config::OpenAIConfig as ProviderConfig;
 use crate::error::{ModelError, Result};
 use crate::provider::{BoxStream, ModelProvider};
-use crate::utils::pcm_to_wav;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::audio::{AudioInput, CreateTranscriptionRequestArgs};
 use async_openai::types::chat::{
@@ -13,17 +11,27 @@ use async_openai::types::InputSource;
 use async_openai::Client;
 use async_trait::async_trait;
 use futures::StreamExt;
+use hound::{WavSpec, WavWriter};
+use serde::{Deserialize, Serialize};
+use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAiApiConfig {
+    pub base_url: String,
+    pub api_key: String,
+    pub model: String,
+}
+
 /// OpenAI API Provider 实现
-pub struct OpenAiProvider {
+pub struct OpenAiApiProvider {
     client: Client<Arc<dyn async_openai::config::Config>>,
     model: String,
 }
 
-impl OpenAiProvider {
-    pub fn new(config: &ProviderConfig) -> Result<Self> {
+impl OpenAiApiProvider {
+    pub fn new(config: &OpenAiApiConfig) -> Result<Self> {
         let openai_config = OpenAIConfig::new()
             .with_api_key(&config.api_key)
             .with_api_base(&config.base_url);
@@ -39,7 +47,7 @@ impl OpenAiProvider {
 }
 
 #[async_trait]
-impl ModelProvider for OpenAiProvider {
+impl ModelProvider for OpenAiApiProvider {
     async fn text_completion(&self, prompt: &str) -> Result<String> {
         let request = CreateCompletionRequestArgs::default()
             .model(&self.model)
@@ -171,15 +179,30 @@ impl ModelProvider for OpenAiProvider {
 
     async fn speech_recognition(
         &self,
-        audio_data: &[u8],
+        audio_data: &[f32],
         sample_rate: u32,
         channels: u8,
-        bits_per_sample: u8,
+        _audio_module: &Arc<nihility_module_audio::AudioModule>,
     ) -> Result<String> {
-        // 将 PCM 数据转换为 WAV 格式
-        let wav_data = pcm_to_wav(audio_data, sample_rate, channels, bits_per_sample)?;
+        // OpenAI expects 16-bit PCM WAV, so convert f32 to 16-bit PCM and create WAV
+        let spec = WavSpec {
+            channels: channels as u16,
+            sample_rate,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
 
-        // 使用 async_openai 库的 Whisper API
+        let mut wav_data = Vec::new();
+        {
+            let mut writer = WavWriter::new(Cursor::new(&mut wav_data), spec)?;
+            for &sample in audio_data {
+                let clamped = sample.clamp(-1.0, 1.0);
+                let sample_i16 = (clamped * 32767.0).round() as i16;
+                writer.write_sample(sample_i16)?;
+            }
+            writer.finalize()?;
+        }
+
         let request = CreateTranscriptionRequestArgs::default()
             .model(&self.model)
             .file(AudioInput {

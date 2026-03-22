@@ -6,10 +6,19 @@ pub enum ModelError {
     Config(#[from] nihility_config::ConfigError),
 
     #[error(transparent)]
+    Ort(#[from] ort::Error),
+
+    #[error(transparent)]
+    ReadNpy(#[from] ndarray_npy::ReadNpyError),
+
+    #[error(transparent)]
     ApiRequest(#[from] async_openai::error::OpenAIError),
 
     #[error(transparent)]
-    Audio(#[from] hound::Error),
+    Audio(#[from] nihility_module_audio::error::AudioError),
+
+    #[error(transparent)]
+    Wav(#[from] hound::Error),
 
     #[error("Provider error: {0}")]
     Provider(String),
@@ -22,7 +31,4 @@ pub enum ModelError {
 
     #[error("Unsupported operation: {0}")]
     Unsupported(String),
-
-    #[error("Audio encode error: {0}")]
-    AudioEncode(String),
 }

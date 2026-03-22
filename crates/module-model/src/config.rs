@@ -1,3 +1,5 @@
+use crate::provider::openai_api::OpenAiApiConfig;
+use crate::provider::sense_voice::SenseVoiceConfig;
 use serde::{Deserialize, Serialize};
 
 /// 模型能力类型
@@ -70,21 +72,14 @@ pub struct ModelEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProviderType {
-    OpenAI(OpenAIConfig),
+    OpenAI(OpenAiApiConfig),
     Embed(EmbedProvider),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAIConfig {
-    pub base_url: String,
-    pub api_key: String,
-    pub model: String,
 }
 
 /// 嵌入提供者配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EmbedProvider {
-    Local { model: String },
+    SenseVoice(SenseVoiceConfig),
 }
 
 fn default_weight() -> u32 {

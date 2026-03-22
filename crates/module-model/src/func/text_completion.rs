@@ -1,6 +1,6 @@
 use crate::config::ModelCapability;
 use crate::error::Result;
-use crate::provider::{BoxStream, ProviderFactory};
+use crate::provider::BoxStream;
 use crate::ModelModule;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -23,8 +23,7 @@ impl ModelModule {
     /// 文本补全
     pub async fn text_completion(&self, param: &TextCompletionParam) -> Result<String> {
         self.pool
-            .invoke(ModelCapability::TextCompletion, move |model| async move {
-                let provider = ProviderFactory::create(&model.provider)?;
+            .invoke(ModelCapability::TextCompletion, |provider| async move {
                 provider.text_completion(&param.prompt).await
             })
             .await
@@ -36,8 +35,7 @@ impl ModelModule {
         param: &TextCompletionStreamParam,
     ) -> Result<BoxStream<String>> {
         self.pool
-            .invoke(ModelCapability::TextCompletion, move |model| async move {
-                let provider = ProviderFactory::create(&model.provider)?;
+            .invoke(ModelCapability::TextCompletion, |provider| async move {
                 provider.text_completion_stream(&param.prompt).await
             })
             .await

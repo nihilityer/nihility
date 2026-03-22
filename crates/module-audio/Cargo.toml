@@ -1,5 +1,5 @@
 [package]
-name = "nihility-module-model"
+name = "nihility-module-audio"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -13,10 +13,7 @@ publish.workspace = true
 [dependencies]
 nihility-config = { workspace = true }
 nihility-module = { workspace = true }
-nihility-module-audio = { workspace = true }
 
-async-openai = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
@@ -24,13 +21,9 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
-rand = { workspace = true }
-futures = { workspace = true }
-tokio-stream = { workspace = true }
+
 hound = { workspace = true }
-ort = { workspace = true }
-realfft = { workspace = true }
-ndarray = { workspace = true }
-ndarray-npy = { workspace = true }
-tokenizers = { workspace = true }
-num-complex = { workspace = true }
+rubato = "0.15"
+
+[dev-dependencies]
+nihility-log = { workspace = true }

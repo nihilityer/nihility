@@ -33,6 +33,7 @@ nihility-module = { path = "crates/module" }
 nihility-module-browser-control = { path = "crates/module-browser-control" }
 nihility-module-edge-device-control = { path = "crates/module-edge-device-control" }
 nihility-module-model = { path = "crates/module-model" }
+nihility-module-audio = { path = "crates/module-audio" }
 nihility-module-manager = { path = "crates/module-manager" }
 nihility-secret = { path = "crates/secret" }
 nihility-server = { path = "server" }
@@ -72,6 +73,12 @@ tokio-tungstenite = { version = "0.29" }
 rkyv = { version = "0.8", default-features = false, features = ["bytecheck", "alloc", "bytes-1"] }
 async-openai = { version = "0.33", default-features = false, features = ["rustls", "completions", "chat-completion", "audio"] }
 hound = { version = "3.5" }
+ort = { version = "2.0.0-rc.12", features = ["ndarray"] }
+realfft = { version = "3.5" }
+ndarray = { version = "0.17", default-features = false }
+ndarray-npy = { version = "0.10", default-features = false }
+tokenizers = { version = "0.22", default-features = false, features = ["esaxx_fast", "onig", "progressbar"] }
+num-complex = { version = "0.4", default-features = false }
 
 sea-orm = { version = "~2.0.0-rc.36", features = ["macros", "serde_json", "with-json", "with-uuid", "runtime-tokio-rustls"] }
 sea-orm-migration = { version = "~2.0.0-rc.36" }

@@ -1,6 +1,6 @@
 use crate::config::ModelCapability;
 use crate::error::Result;
-use crate::provider::{BoxStream, ProviderFactory};
+use crate::provider::BoxStream;
 use crate::ModelModule;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -25,20 +25,13 @@ pub struct ImageUnderstandingStreamParam {
 
 impl ModelModule {
     /// 图片理解
-    pub async fn image_understanding(
-        &self,
-        param: &ImageUnderstandingParam,
-    ) -> Result<String> {
+    pub async fn image_understanding(&self, param: &ImageUnderstandingParam) -> Result<String> {
         self.pool
-            .invoke(
-                ModelCapability::ImageUnderstanding,
-                move |model| async move {
-                    let provider = ProviderFactory::create(&model.provider)?;
-                    provider
-                        .image_understanding(&param.image_url, &param.prompt)
-                        .await
-                },
-            )
+            .invoke(ModelCapability::ImageUnderstanding, |provider| async move {
+                provider
+                    .image_understanding(&param.image_url, &param.prompt)
+                    .await
+            })
             .await
     }
 
@@ -48,15 +41,11 @@ impl ModelModule {
         param: &ImageUnderstandingStreamParam,
     ) -> Result<BoxStream<String>> {
         self.pool
-            .invoke(
-                ModelCapability::ImageUnderstanding,
-                move |model| async move {
-                    let provider = ProviderFactory::create(&model.provider)?;
-                    provider
-                        .image_understanding_stream(&param.image_url, &param.prompt)
-                        .await
-                },
-            )
+            .invoke(ModelCapability::ImageUnderstanding, |provider| async move {
+                provider
+                    .image_understanding_stream(&param.image_url, &param.prompt)
+                    .await
+            })
             .await
     }
 }

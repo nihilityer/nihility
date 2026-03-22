@@ -3,9 +3,11 @@ use crate::error::{ModelError, Result};
 use async_trait::async_trait;
 use futures::Stream;
 use std::pin::Pin;
+use std::sync::Arc;
 use tracing::debug;
 
-mod openai;
+pub(crate) mod openai_api;
+pub(crate) mod sense_voice;
 
 pub type BoxStream<T> = Pin<Box<dyn Stream<Item = Result<T>> + Send + 'static>>;
 
@@ -57,16 +59,15 @@ pub trait ModelProvider: Send + Sync {
     /// 语音识别
     async fn speech_recognition(
         &self,
-        audio_data: &[u8],
+        audio_data: &[f32],
         sample_rate: u32,
         channels: u8,
-        bits_per_sample: u8,
+        _audio_module: &Arc<nihility_module_audio::AudioModule>,
     ) -> Result<String> {
         debug!(
-            "speech_recognition: sample_rate: {}, channels: {}, bits_per_sample: {}, data_len: {}",
+            "speech_recognition: sample_rate: {}, channels: {}, data_len: {}",
             sample_rate,
             channels,
-            bits_per_sample,
             audio_data.len()
         );
         Err(ModelError::Unsupported(
@@ -81,10 +82,14 @@ pub struct ProviderFactory;
 impl ProviderFactory {
     pub fn create(provider_type: &ProviderType) -> Result<Box<dyn ModelProvider>> {
         match provider_type {
-            ProviderType::OpenAI(config) => Ok(Box::new(openai::OpenAiProvider::new(config)?)),
-            ProviderType::Embed(_) => Err(ModelError::Provider(
-                "Embed provider not implemented yet".to_string(),
-            )),
+            ProviderType::OpenAI(config) => {
+                Ok(Box::new(openai_api::OpenAiApiProvider::new(config)?))
+            }
+            ProviderType::Embed(embed) => match embed {
+                crate::config::EmbedProvider::SenseVoice(cfg) => {
+                    Ok(Box::new(sense_voice::SenseVoice::init(cfg.clone())?))
+                }
+            },
         }
     }
 }
