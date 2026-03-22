@@ -26,8 +26,8 @@ pub enum ModelError {
     #[error("No available model for capability")]
     NoAvailableModel,
 
-    #[error("All models failed")]
-    AllModelsFailed,
+    #[error("All models failed: {0:?}")]
+    AllModelsFailed(Vec<(String, ModelError)>),
 
     #[error("Unsupported operation: {0}")]
     Unsupported(String),

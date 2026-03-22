@@ -2,6 +2,7 @@ use crate::config::ModelCapability;
 use crate::ModelModule;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// 语音识别请求参数
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -24,19 +25,20 @@ impl ModelModule {
             crate::error::ModelError::Provider("audio_module not set".to_string())
         })?;
         self.pool
-            .invoke(
-                ModelCapability::SpeechRecognition,
-                move |provider| async move {
+            .invoke(ModelCapability::SpeechRecognition, |provider| {
+                let audio_data = param.audio_data.clone();
+                let audio_module = audio_module.clone();
+                async move {
                     provider
                         .speech_recognition(
-                            &param.audio_data,
+                            &audio_data,
                             param.sample_rate,
                             param.channels,
                             &audio_module,
                         )
                         .await
-                },
-            )
+                }
+            })
             .await
     }
 }

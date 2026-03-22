@@ -157,10 +157,13 @@ impl ModelPool {
             .map(|m| m.weight())
     }
 
-    /// 调用模型
+    /// 调用模型（支持自动重试）
+    ///
+    /// 按负载均衡策略选择初始模型，失败时自动尝试下一个有效模型，
+    /// 直到所有模型都失败或其中一个成功。
     pub async fn invoke<F, Fut, R>(&self, capability: ModelCapability, f: F) -> Result<R>
     where
-        F: FnOnce(Arc<Box<dyn ModelProvider>>) -> Fut,
+        F: Fn(Arc<Box<dyn ModelProvider>>) -> Fut,
         Fut: Future<Output = Result<R>>,
     {
         // 获取该能力的模型索引
@@ -173,65 +176,75 @@ impl ModelPool {
             return Err(ModelError::NoAvailableModel);
         }
 
-        // 选择模型
-        let idx = {
+        // 获取所有有效模型（weight > 0）
+        let valid_indices: Vec<usize> = {
             let models = self.models.read().await;
-            // 按权重过滤
-            let valid_indices: Vec<usize> = indices
+            indices
                 .into_iter()
                 .filter(|&i| models[i].weight() > 0)
-                .collect();
+                .collect()
+        };
 
-            if valid_indices.is_empty() {
-                return Err(ModelError::NoAvailableModel);
-            }
+        if valid_indices.is_empty() {
+            return Err(ModelError::NoAvailableModel);
+        }
 
-            // 根据负载均衡策略选择
+        // 获取初始起始偏移（根据负载均衡策略）
+        let start_offset = {
+            let models = self.models.read().await;
             match self.load_balance.strategy {
                 LoadBalanceType::WeightedRoundRobin => {
-                    let idx = self.round_robin_counter.fetch_add(1, Ordering::SeqCst) % valid_indices.len();
-                    valid_indices[idx]
+                    self.round_robin_counter.fetch_add(1, Ordering::SeqCst) % valid_indices.len()
                 }
                 LoadBalanceType::WeightedRandom => {
-                    // 计算总权重
                     let total_weight: u32 = valid_indices
                         .iter()
                         .map(|&i| models[i].weight())
                         .sum();
-
-                    // 加权随机选择
-                    let random_value = rand::random::<u32>() % total_weight;
-
-                    let mut cumulative = 0u32;
-                    let mut selected_idx = *valid_indices.last().unwrap();
-                    for &idx in &valid_indices {
-                        cumulative += models[idx].weight();
-                        if random_value < cumulative {
-                            selected_idx = idx;
-                            break;
-                        }
+                    if total_weight == 0 {
+                        0usize
+                    } else {
+                        (rand::random::<u32>() % total_weight) as usize
                     }
-                    selected_idx
                 }
             }
         };
 
-        // 获取或创建 provider
-        let provider = self.ensure_provider(idx).await?;
+        // 遍历所有有效模型进行重试
+        let mut errors = Vec::new();
+        for offset in 0..valid_indices.len() {
+            let idx = valid_indices[(start_offset + offset) % valid_indices.len()];
 
-        // 调用
-        let result = f(provider).await;
+            // 获取模型名称（用于错误信息）
+            let model_name = {
+                let models = self.models.read().await;
+                models[idx].entry.name.clone()
+            };
 
-        // 处理结果
-        match result {
-            Ok(r) => {
-                self.report_success_by_idx(idx).await;
-                Ok(r)
-            }
-            Err(e) => {
-                self.report_failure_by_idx(idx).await;
-                Err(e)
+            // 获取或创建 provider
+            let provider = match self.ensure_provider(idx).await {
+                Ok(p) => p,
+                Err(e) => {
+                    errors.push((model_name, e));
+                    continue;
+                }
+            };
+
+            // 调用
+            match f(provider).await {
+                Ok(r) => {
+                    self.report_success_by_idx(idx).await;
+                    return Ok(r);
+                }
+                Err(e) => {
+                    self.report_failure_by_idx(idx).await;
+                    errors.push((model_name, e));
+                    // 继续尝试下一个模型
+                }
             }
         }
+
+        // 所有模型都失败
+        Err(ModelError::AllModelsFailed(errors))
     }
 }
