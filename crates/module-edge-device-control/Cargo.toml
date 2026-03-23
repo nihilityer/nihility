@@ -14,7 +14,9 @@ publish.workspace = true
 nihility-config = { workspace = true }
 nihility-edge-protocol = { workspace = true }
 nihility-module = { workspace = true }
+nihility-module-audio = { workspace = true }
 nihility-module-browser-control = { workspace = true }
+nihility-module-model = { workspace = true }
 
 uuid = { workspace = true }
 tracing = { workspace = true }

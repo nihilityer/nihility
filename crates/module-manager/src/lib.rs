@@ -58,6 +58,7 @@ impl ModuleManager {
 
         let mut browser_control = None;
         let mut audio_module = None;
+        let mut model_module = None;
 
         for enable_module in config.enable_modules {
             match enable_module {
@@ -67,21 +68,6 @@ impl ModuleManager {
                             let module = Arc::new(RwLock::new(nihility_module_browser_control::BrowserControl::init_from_file_config().await?));
                             browser_control = Some(module.clone());
                             modules.insert(ModuleType::Embed(embed_module), module);
-                        }
-                        EmbedModule::EdgeDeviceControl => {
-                            let mut module = nihility_module_edge_device_control::EdgeDeviceControl::init_from_file_config().await?;
-                            if let Some(browser_control) = browser_control.as_ref() {
-                                module.set_browser_control(browser_control.clone());
-                            } else {
-                                error!(
-                                    "browser_control module does not exist for module type: {:?}",
-                                    embed_module
-                                );
-                            }
-                            modules.insert(
-                                ModuleType::Embed(embed_module),
-                                Arc::new(RwLock::new(module)),
-                            );
                         }
                         EmbedModule::Audio => {
                             let module = nihility_module_audio::AudioModule::init_from_file_config().await?;
@@ -94,6 +80,34 @@ impl ModuleManager {
                             } else {
                                 error!(
                                     "audio module does not exist for module type: {:?}",
+                                    embed_module
+                                );
+                            }
+                            model_module = Some(Arc::new(RwLock::new(module)));
+                        }
+                        EmbedModule::EdgeDeviceControl => {
+                            let mut module = nihility_module_edge_device_control::EdgeDeviceControl::init_from_file_config().await?;
+                            if let Some(browser_control) = browser_control.as_ref() {
+                                module.set_browser_control(browser_control.clone());
+                            } else {
+                                error!(
+                                    "browser_control module does not exist for module type: {:?}",
+                                    embed_module
+                                );
+                            }
+                            if let Some(audio) = audio_module.as_ref() {
+                                module.set_audio_module(audio.clone());
+                            } else {
+                                error!(
+                                    "audio module does not exist for module type: {:?}",
+                                    embed_module
+                                );
+                            }
+                            if let Some(model) = model_module.as_ref() {
+                                module.set_model_module(model.clone());
+                            } else {
+                                error!(
+                                    "model module does not exist for module type: {:?}",
                                     embed_module
                                 );
                             }
@@ -236,9 +250,9 @@ impl ModuleManagerConfig {
 
         embeds.sort_by_key(|embed| match embed {
             EmbedModule::BrowserControl => 0,
-            EmbedModule::EdgeDeviceControl => 1,
-            EmbedModule::Audio => 2,
-            EmbedModule::Model => 3,
+            EmbedModule::Audio => 1,
+            EmbedModule::Model => 2,
+            EmbedModule::EdgeDeviceControl => 3,
         });
 
         let mut enable_modules = Vec::with_capacity(embeds.len() + wasms.len());

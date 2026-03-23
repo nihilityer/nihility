@@ -10,6 +10,15 @@ pub enum AudioError {
     #[error(transparent)]
     Wav(#[from] hound::Error),
 
+    #[error(transparent)]
+    NdArray(#[from] ndarray::ShapeError),
+
+    #[error(transparent)]
+    Ort(#[from] ort::Error),
+
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+
     #[error("Unsupported bits_per_sample: {0}")]
     UnsupportedBitsPerSample(u8),
 
@@ -25,6 +34,9 @@ pub enum AudioError {
     #[error("PCM data length mismatch: expected {expected}, got {actual}")]
     PcmLengthMismatch { expected: usize, actual: usize },
 
-    #[error("Resampling error: {0}")]
-    ResampleError(String),
+    #[error("VAD error: {0}")]
+    VadError(String),
+
+    #[error("VAD init error: {0}")]
+    VadInitError(String),
 }

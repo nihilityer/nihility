@@ -2,12 +2,15 @@ use crate::device::connect_ws::connect_ws;
 use crate::device::task::message_handler::start_message_handler;
 use crate::device::task::screen_refresh::start_screen_refresh;
 use crate::error::*;
+use crate::AsrResult;
 use nihility_edge_protocol::{DeviceInfo, Message};
+use nihility_module_audio::AudioModule;
 use nihility_module_browser_control::BrowserControl;
+use nihility_module_model::ModelModule;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::task::JoinHandle;
 
 pub mod connect_ws;
@@ -48,6 +51,9 @@ impl Device {
         &mut self,
         devices: Arc<RwLock<HashMap<String, Device>>>,
         browser_control: Arc<RwLock<BrowserControl>>,
+        audio_module: Arc<AudioModule>,
+        model_module: Arc<RwLock<ModelModule>>,
+        asr_result_tx: Arc<broadcast::Sender<AsrResult>>,
         page_id: &str,
         screenshot_selector: Option<String>,
     ) -> Result<()> {
@@ -64,6 +70,9 @@ impl Device {
                 self.info.device_id.clone(),
                 devices.clone(),
                 browser_control.clone(),
+                audio_module,
+                model_module,
+                asr_result_tx,
                 rx,
             )
             .await?;

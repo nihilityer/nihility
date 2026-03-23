@@ -11,7 +11,7 @@ use pool::ModelPool;
 use std::sync::Arc;
 use tracing::info;
 
-pub use nihility_module_audio::{MergeChannelsParam, PcmToWavParam, ResampleParam};
+pub use nihility_module_audio::{MergeChannelsParam, PcmToWavParam};
 
 /// 模型模块主结构
 pub struct ModelModule {

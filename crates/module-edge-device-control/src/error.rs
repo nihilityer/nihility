@@ -20,6 +20,9 @@ pub enum EdgeDeviceControlError {
     #[error(transparent)]
     BrowserControl(#[from] nihility_module_browser_control::error::BrowserControlError),
 
+    #[error(transparent)]
+    Audio(#[from] nihility_module_audio::error::AudioError),
+
     #[error("Serialization error: {0}")]
     Serialization(String),
 
@@ -31,4 +34,7 @@ pub enum EdgeDeviceControlError {
 
     #[error("Module status error: {0}")]
     ModuleStatus(String),
+
+    #[error("Other error: {0}")]
+    Other(String),
 }

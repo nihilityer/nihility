@@ -1,6 +1,5 @@
-use crate::func::merge_channels::{merge_channels, MergeChannelsParam};
-use crate::func::pcm_to_wav::{pcm_to_wav, PcmToWavParam};
-use crate::func::resample::{resample, ResampleParam};
+use crate::func::merge_channels::MergeChannelsParam;
+use crate::func::pcm_to_wav::PcmToWavParam;
 use crate::AudioModule;
 use nihility_module::{BoxStream, Callable, FunctionMetadata, Module};
 use schemars::schema_for;
@@ -8,21 +7,21 @@ use serde_json::Value;
 
 pub mod merge_channels;
 pub mod pcm_to_wav;
-pub mod resample;
 
 #[async_trait::async_trait]
 impl Callable for AudioModule {
     async fn call(&self, func_name: &str, param: Value) -> anyhow::Result<Value> {
         match func_name {
-            "pcm_to_wav" => Ok(serde_json::to_value(pcm_to_wav(
-                serde_json::from_value(param)?,
-            )?)?),
-            "merge_channels" => Ok(serde_json::to_value(merge_channels(
-                serde_json::from_value(param)?,
-            )?)?),
-            "resample" => Ok(serde_json::to_value(resample(
-                serde_json::from_value(param)?,
-            )?)?),
+            "pcm_to_wav" => {
+                let p = serde_json::from_value::<PcmToWavParam>(param)?;
+                let result = self.pcm_to_wav(p)?;
+                Ok(serde_json::to_value(result)?)
+            }
+            "merge_channels" => {
+                let p = serde_json::from_value::<MergeChannelsParam>(param)?;
+                let result = self.merge_channels(p)?;
+                Ok(serde_json::to_value(result)?)
+            }
             _ => Err(anyhow::anyhow!("Unsupported func_name: {}", func_name)),
         }
     }
@@ -36,13 +35,15 @@ impl Callable for AudioModule {
         _func_name: &str,
         _param: Value,
     ) -> anyhow::Result<BoxStream<Value>> {
-        Err(anyhow::anyhow!("AudioModule does not support streaming"))
+        Err(anyhow::anyhow!(
+            "vad_stream is not exposed via Callable, use create_vad_stream_handler directly"
+        ))
     }
 }
 
 impl Module for AudioModule {
     fn description(&self) -> &str {
-        "音频处理模块，提供WAV格式转换、声道合并、采样率转换等功能"
+        "音频处理模块，提供WAV格式转换、声道合并、VAD等功能"
     }
 
     fn no_perm_func(&self) -> Vec<FunctionMetadata> {
@@ -60,13 +61,6 @@ impl Module for AudioModule {
                 tags: vec!["audio".to_string()],
                 params: serde_json::to_value(schema_for!(MergeChannelsParam))
                     .expect("audio func merge_channels build param"),
-            },
-            FunctionMetadata {
-                name: "resample".to_string(),
-                desc: "将音频采样率转换为目标采样率".to_string(),
-                tags: vec!["audio".to_string()],
-                params: serde_json::to_value(schema_for!(ResampleParam))
-                    .expect("audio func resample build param"),
             },
         ]
     }

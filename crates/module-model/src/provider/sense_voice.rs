@@ -220,6 +220,12 @@ impl ModelProvider for SenseVoice {
         channels: u8,
         audio_module: &Arc<nihility_module_audio::AudioModule>,
     ) -> Result<String> {
+        // 验证采样率（固定 16000）
+        debug_assert_eq!(
+            sample_rate, 16000,
+            "Audio sample rate must be 16000 Hz"
+        );
+
         // Step 1: 声道合并 (stereo -> mono)
         let waveform = if channels > 1 {
             audio_module.merge_channels(crate::MergeChannelsParam {
@@ -230,18 +236,7 @@ impl ModelProvider for SenseVoice {
             audio_data.to_vec()
         };
 
-        // Step 2: 采样率转换 (如果不是 16000)
-        let waveform = if sample_rate != 16000 {
-            audio_module.resample(crate::ResampleParam {
-                waveform,
-                from_rate: sample_rate,
-                to_rate: 16000,
-            })?
-        } else {
-            waveform
-        };
-
-        // Step 3: 推理
+        // Step 2: 推理
         self.infer(waveform).await
     }
 }

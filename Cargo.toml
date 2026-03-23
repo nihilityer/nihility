@@ -75,6 +75,7 @@ async-openai = { version = "0.33", default-features = false, features = ["rustls
 hound = { version = "3.5" }
 ort = { version = "2.0.0-rc.12", features = ["ndarray"] }
 realfft = { version = "3.5" }
+rubato = { version = "1.0" }
 ndarray = { version = "0.17", default-features = false }
 ndarray-npy = { version = "0.10", default-features = false }
 tokenizers = { version = "0.22", default-features = false, features = ["esaxx_fast", "onig", "progressbar"] }

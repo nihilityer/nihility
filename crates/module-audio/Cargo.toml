@@ -23,7 +23,13 @@ async-trait = { workspace = true }
 anyhow = { workspace = true }
 
 hound = { workspace = true }
-rubato = "0.15"
+ndarray = { workspace = true }
+rubato = { workspace = true }
+ort = { workspace = true }
+
+tokio = { workspace = true }
+futures = { workspace = true }
+tokio-stream = { workspace = true }
 
 [dev-dependencies]
 nihility-log = { workspace = true }

@@ -1,4 +1,5 @@
 use crate::{
+    audio::AudioData,
     key::KeyEvent,
     screen::{FullScreenData, IncrementalScreenData, ScreenConfig},
 };
@@ -10,6 +11,7 @@ use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 pub enum Message {
     // 设备发送的消息
     KeyEvent(KeyEvent),
+    AudioData(AudioData),
 
     // 控制模块发送的消息
     FullScreenUpdate(FullScreenData),
