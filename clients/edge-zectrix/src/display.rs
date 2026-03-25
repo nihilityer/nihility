@@ -1,10 +1,13 @@
+mod ssd1683;
+mod ssd2683;
+
 use anyhow::Result;
 use core::cell::Cell;
 use critical_section::Mutex;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig};
-use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO4, GPIO8, GPIO9, SPI2};
+use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO13, GPIO8, GPIO9, SPI3};
 use esp_hal::spi::master::Spi;
 use esp_hal::spi::{BitOrder, Mode};
 use esp_hal::time::Rate;
@@ -34,13 +37,13 @@ static DISPLAY: Mutex<
 static UPDATE_COUNT: Mutex<Cell<usize>> = Mutex::new(Cell::new(0));
 
 pub fn init_display(
-    busy: GPIO4<'static>,
-    reset: GPIO8<'static>,
-    dc: GPIO9<'static>,
-    cs: GPIO10<'static>,
-    spi2: SPI2<'static>,
+    busy: GPIO8<'static>,
+    reset: GPIO9<'static>,
+    dc: GPIO10<'static>,
+    cs: GPIO11<'static>,
+    spi2: SPI3<'static>,
     sck: GPIO12<'static>,
-    mosi: GPIO11<'static>,
+    sio: GPIO13<'static>,
 ) -> Result<()> {
     let busy = Input::new(busy, InputConfig::default());
     let reset = Output::new(reset, Level::Low, OutputConfig::default());
@@ -55,7 +58,7 @@ pub fn init_display(
             .with_write_bit_order(BitOrder::MsbFirst),
     )?
     .with_sck(sck)
-    .with_mosi(mosi);
+    .with_sio0(sio);
     let spi_device = ExclusiveDevice::new(spi, cs, Delay::new())?;
 
     let interface = Interface::new(spi_device, busy, reset, dc);

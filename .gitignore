@@ -23,6 +23,7 @@ config
 log
 data
 output
+ref
 
 # Logs
 logs

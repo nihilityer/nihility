@@ -42,13 +42,13 @@ pub async fn init(spawner: Spawner) -> Result<()> {
 
     init_storage(peripherals.FLASH)?;
     init_display(
-        peripherals.GPIO4,
         peripherals.GPIO8,
         peripherals.GPIO9,
         peripherals.GPIO10,
-        peripherals.SPI2,
-        peripherals.GPIO12,
         peripherals.GPIO11,
+        peripherals.SPI3,
+        peripherals.GPIO12,
+        peripherals.GPIO13,
     )?;
 
     // 初始化并清空屏幕（显示全白）
