@@ -1,4 +1,5 @@
-use crate::display::ssd1683::DisplayInterface;
+use crate::display::epd::EpdInterface;
+use anyhow::Result;
 
 /// 填充数据缓冲区（数组）并返回一个包含命令和填充缓冲区中适当大小切片的元组。
 /// ```
@@ -125,7 +126,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn execute<I: DisplayInterface>(&self, interface: &mut I) -> Result<(), I::Error> {
+    pub fn execute(&self, interface: &mut EpdInterface) -> Result<()> {
         use self::Command::*;
 
         let mut buf = [0u8; 4];

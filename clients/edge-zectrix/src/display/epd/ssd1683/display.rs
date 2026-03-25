@@ -1,41 +1,19 @@
-use crate::display::ssd1683::{
-    Command, DataEntryMode, DeepSleepMode, DisplayInterface, IncrementAxis, Interface,
-};
+use crate::display::epd::ssd1683::{Command, DataEntryMode, DeepSleepMode, IncrementAxis};
+use crate::display::epd::EpdInterface;
 use anyhow::Result;
-use embedded_hal::delay::DelayNs;
-use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_hal::spi::SpiDevice;
+use esp_hal::delay::Delay;
 
 /// 基于数据驱动的显示驱动
-pub struct Display<SPI, BUSY, RESET, DC, DELAY>
-where
-    SPI: SpiDevice,
-    BUSY: InputPin,
-    DC: OutputPin,
-    RESET: OutputPin,
-    DELAY: DelayNs,
-{
-    interface: Interface<SPI, BUSY, RESET, DC>,
-    delay: DELAY,
+pub struct Display {
+    interface: EpdInterface,
+    delay: Delay,
     width: usize,
     height: u16,
 }
 
-impl<SPI, BUSY, RESET, DC, DELAY> Display<SPI, BUSY, RESET, DC, DELAY>
-where
-    SPI: SpiDevice,
-    BUSY: InputPin,
-    RESET: OutputPin,
-    DC: OutputPin,
-    DELAY: DelayNs,
-{
+impl Display {
     /// 创建新的显示驱动实例
-    pub fn new(
-        interface: Interface<SPI, BUSY, RESET, DC>,
-        delay: DELAY,
-        width: usize,
-        height: u16,
-    ) -> Self {
+    pub fn new(interface: EpdInterface, delay: Delay, width: usize, height: u16) -> Self {
         if !width.is_multiple_of(8) {
             panic!("Width must be multiple of 8");
         }
@@ -50,12 +28,12 @@ where
     /// 全局正常刷新初始化
     pub fn normal_init(&mut self) -> Result<()> {
         // 硬件重置
-        self.interface.reset(&mut self.delay)?;
-        self.interface.busy_wait();
+        self.interface.reset(&self.delay, false)?;
+        self.interface.busy_wait_low();
 
         // 软复位
         Command::SoftReset.execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
 
         Command::DriverOutputControl(self.height - 1, 0x00).execute(&mut self.interface)?;
         Command::DisplayUpdateControl1(0x4000).execute(&mut self.interface)?;
@@ -74,7 +52,7 @@ where
         // 设置 RAM 地址
         Command::XAddress(0x00).execute(&mut self.interface)?;
         Command::YAddress(self.height - 1).execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
 
         Ok(())
     }
@@ -83,12 +61,12 @@ where
     /// more_fast为true时，大约1.0s,反之1.5s
     pub fn fast_init(&mut self, more_fast: bool) -> Result<()> {
         // 硬件重置
-        self.interface.reset(&mut self.delay)?;
-        self.interface.busy_wait();
+        self.interface.reset(&self.delay, false)?;
+        self.interface.busy_wait_low();
 
         // 软复位
         Command::SoftReset.execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
 
         Command::DisplayUpdateControl1(0x4000).execute(&mut self.interface)?;
         Command::BorderWaveform(0x05).execute(&mut self.interface)?;
@@ -103,7 +81,7 @@ where
         // 加载温度值
         Command::DisplayUpdateControl2(0x91).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
 
         // 配置数据输入模式
         Command::DataEntryMode(
@@ -120,7 +98,7 @@ where
         // 设置 RAM 地址
         Command::XAddress(0x00).execute(&mut self.interface)?;
         Command::YAddress(self.height - 1).execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
 
         Ok(())
     }
@@ -129,7 +107,7 @@ where
     pub fn normal_update(&mut self) -> Result<()> {
         Command::DisplayUpdateControl2(0xF7).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
         Ok(())
     }
 
@@ -137,7 +115,7 @@ where
     pub fn fast_update(&mut self) -> Result<()> {
         Command::DisplayUpdateControl2(0xC7).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
         Ok(())
     }
 
@@ -145,7 +123,7 @@ where
     pub fn part_update(&mut self) -> Result<()> {
         Command::DisplayUpdateControl2(0xFF).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
-        self.interface.busy_wait();
+        self.interface.busy_wait_low();
         Ok(())
     }
 
@@ -224,7 +202,7 @@ where
         let y_end = y_start + height - 1;
 
         // 硬件重置
-        self.interface.reset(&mut self.delay)?;
+        self.interface.reset(&self.delay, false)?;
 
         // 配置边框波形和显示更新控制（局部刷新配置）
         Command::BorderWaveform(0x80).execute(&mut self.interface)?;
@@ -248,7 +226,7 @@ where
     /// 手动进入深度睡眠模式
     pub fn deep_sleep(&mut self, mode: DeepSleepMode) -> Result<()> {
         Command::DeepSleepMode(mode).execute(&mut self.interface)?;
-        self.delay.delay_ms(100);
+        self.delay.delay_millis(100);
         Ok(())
     }
 }

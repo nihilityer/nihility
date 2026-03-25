@@ -1,38 +1,24 @@
-mod ssd1683;
-mod ssd2683;
+mod epd;
 
+use crate::display::epd::EpdInterface;
 use anyhow::Result;
 use core::cell::Cell;
 use critical_section::Mutex;
-use embedded_hal_bus::spi::ExclusiveDevice;
+use epd::ssd1683::{DeepSleepMode, Display};
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig};
 use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO13, GPIO8, GPIO9, SPI3};
 use esp_hal::spi::master::Spi;
 use esp_hal::spi::{BitOrder, Mode};
 use esp_hal::time::Rate;
-use esp_hal::Blocking;
 use log::{error, info};
 use nihility_edge_protocol::UpdateRegion;
-use ssd1683::{DeepSleepMode, Display, Interface};
 
 const WIDTH: u16 = 400;
 const HEIGHT: u16 = 300;
 const MAX_FAST_UPDATES: usize = 10;
 
-static DISPLAY: Mutex<
-    Cell<
-        Option<
-            Display<
-                ExclusiveDevice<Spi<'static, Blocking>, Output, Delay>,
-                Input,
-                Output,
-                Output,
-                Delay,
-            >,
-        >,
-    >,
-> = Mutex::new(Cell::new(None));
+static DISPLAY: Mutex<Cell<Option<Display>>> = Mutex::new(Cell::new(None));
 
 static UPDATE_COUNT: Mutex<Cell<usize>> = Mutex::new(Cell::new(0));
 
@@ -58,10 +44,10 @@ pub fn init_display(
             .with_write_bit_order(BitOrder::MsbFirst),
     )?
     .with_sck(sck)
+    .with_cs(cs)
     .with_sio0(sio);
-    let spi_device = ExclusiveDevice::new(spi, cs, Delay::new())?;
 
-    let interface = Interface::new(spi_device, busy, reset, dc);
+    let interface = EpdInterface::new(spi, busy, reset, dc);
     let display = Display::new(interface, Delay::new(), WIDTH as usize, HEIGHT);
 
     critical_section::with(|cs| {
