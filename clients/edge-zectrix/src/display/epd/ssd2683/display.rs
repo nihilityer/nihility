@@ -180,10 +180,10 @@ impl EpdDisplay for Display {
         let x_end = x + w - 1;
         let y_end = y + h - 1;
         Command::SetPartialWindow {
-            hrst_h: 0x00,
-            hrst_l: x as u8,
-            hred_h: 0x00,
-            hred_l: x_end as u8,
+            hrst_h: ((x >> 8) & 0x03) as u8,
+            hrst_l: (x & 0xFF) as u8,
+            hred_h: ((x_end >> 8) & 0x03) as u8,
+            hred_l: (x_end & 0xFF) as u8,
             vrst_h: ((y >> 8) & 0x03) as u8,
             vrst_l: (y & 0xFF) as u8,
             vred_h: ((y_end >> 8) & 0x03) as u8,
