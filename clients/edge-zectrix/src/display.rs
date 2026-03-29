@@ -92,12 +92,10 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
             }
 
             for (i, region) in regions.iter().enumerate() {
-                let region_y = HEIGHT - region.y - region.height;
-
                 if let Err(e) = EpdDisplay::partial_update(
                     &mut display,
                     region.x,
-                    region_y,
+                    region.y,
                     region.width,
                     region.height,
                     &region.data,

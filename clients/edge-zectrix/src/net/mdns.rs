@@ -71,7 +71,7 @@ async fn run_mdns(stack: Stack<'_>) -> Result<()> {
             ("screen_refresh_interval", "100"),
             ("screen_rotation", "0"),
             ("screen_mirror_h", "false"),
-            ("screen_mirror_v", "true"),
+            ("screen_mirror_v", "false"),
         ],
     };
 

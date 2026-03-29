@@ -68,7 +68,6 @@ pub(crate) async fn start_screen_refresh(
             };
 
             // 4. 计算更新类型
-
             // 5. 根据更新类型决定是否发送消息
             match processor.diff(full_screen) {
                 ScreenUpdate::Full(full_screen) => {

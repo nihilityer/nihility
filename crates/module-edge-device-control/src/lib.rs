@@ -98,22 +98,6 @@ impl EdgeDeviceControl {
     pub fn subscribe_asr_results(&self) -> broadcast::Receiver<AsrResult> {
         self.asr_result_tx.subscribe()
     }
-
-    /// 广播 ASR 识别结果
-    pub(crate) fn broadcast_asr_result(&self, result: AsrResult) {
-        // 忽略发送失败的接收者
-        let _ = self.asr_result_tx.send(result);
-    }
-
-    /// 获取音频模块引用
-    pub fn audio_module(&self) -> Option<&Arc<AudioModule>> {
-        self.audio_module.as_ref()
-    }
-
-    /// 获取模型模块引用
-    pub fn model_module(&self) -> Option<&Arc<RwLock<ModelModule>>> {
-        self.model_module.as_ref()
-    }
 }
 
 impl Default for EdgeDeviceControlConfig {

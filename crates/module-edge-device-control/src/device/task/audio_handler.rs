@@ -219,37 +219,39 @@ pub async fn start_audio_handler(
         .map_err(|e| EdgeDeviceControlError::Other(format!("VAD init error: {}", e)))?;
 
     // 处理音频数据
-    while let Some(audio_data) = audio_rx.recv().await {
-        {
-            let mut handler = handler.write().await;
-            if let Err(e) = handler.process_audio(audio_data).await {
-                error!("Error processing audio: {:?}", e);
-                continue;
-            }
-        }
-
-        // 获取处理后的音频并发送到 VAD 检测
-        let audio_chunk = {
-            let handler = handler.read().await;
-            handler.audio_buffer.back().cloned()
-        };
-
-        if let Some(chunk) = audio_chunk {
-            // 使用新的 process 方法进行 VAD 检测
-            match vad_handler.process(&chunk.data).await {
-                Ok(Some(segment)) => {
-                    let mut handler = handler.write().await;
-                    handler.on_speech_start(segment.index);
-                }
-                Ok(None) => {
-                    // 没有检测到语音片段，继续
-                }
-                Err(e) => {
-                    error!("VAD process error: {:?}", e);
+    tokio::spawn(async move {
+        while let Some(audio_data) = audio_rx.recv().await {
+            {
+                let mut handler = handler.write().await;
+                if let Err(e) = handler.process_audio(audio_data).await {
+                    error!("Error processing audio: {:?}", e);
+                    continue;
                 }
             }
+
+            // 获取处理后的音频并发送到 VAD 检测
+            let audio_chunk = {
+                let handler = handler.read().await;
+                handler.audio_buffer.back().cloned()
+            };
+
+            if let Some(chunk) = audio_chunk {
+                // 使用新的 process 方法进行 VAD 检测
+                match vad_handler.process(&chunk.data).await {
+                    Ok(Some(segment)) => {
+                        let mut handler = handler.write().await;
+                        handler.on_speech_start(segment.index);
+                    }
+                    Ok(None) => {
+                        // 没有检测到语音片段，继续
+                    }
+                    Err(e) => {
+                        error!("VAD process error: {:?}", e);
+                    }
+                }
+            }
         }
-    }
+    });
 
     Ok(())
 }

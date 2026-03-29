@@ -5,7 +5,6 @@ pub mod vad_stream;
 
 use error::Result;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 use crate::vad::silero::Silero;
 pub use func::merge_channels::MergeChannelsParam;
