@@ -20,6 +20,7 @@ use embassy_executor::Spawner;
 use embassy_net::{Config, DhcpConfig, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::CpuClock;
+use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::wifi::{AccessPointConfig, ClientConfig};
@@ -39,6 +40,12 @@ pub async fn init(spawner: Spawner) -> Result<()> {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
     esp_rtos::start(TimerGroup::new(peripherals.TIMG0).timer0);
+
+    #[cfg(feature = "ssd2683")]
+    {
+        let _pwr = Output::new(peripherals.GPIO17, Level::High, OutputConfig::default());
+        let _epd_pwr = Output::new(peripherals.GPIO6, Level::High, OutputConfig::default());
+    }
 
     init_storage(peripherals.FLASH)?;
     init_display(

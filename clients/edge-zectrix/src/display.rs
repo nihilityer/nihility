@@ -9,7 +9,7 @@ use critical_section::Mutex;
 use epd::Display;
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig};
-use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO13, GPIO8, GPIO9, SPI3};
+use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO13, GPIO6, GPIO8, GPIO9, SPI3};
 use esp_hal::spi::master::Spi;
 use esp_hal::spi::{BitOrder, Mode};
 use esp_hal::time::Rate;
@@ -133,12 +133,12 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
             // 对每个区域执行部分写入
             for (i, region) in regions.iter().enumerate() {
                 // 转换Y坐标
-                let ssd1683_y = HEIGHT - region.y - region.height;
+                let region_y = HEIGHT - region.y - region.height;
 
                 if let Err(e) = EpdDisplay::write_partial(
                     &mut display,
                     region.x,
-                    ssd1683_y,
+                    region_y,
                     region.width,
                     region.height,
                     &region.data,

@@ -1,6 +1,6 @@
 use crate::display::epd::ssd1683::{Command, DataEntryMode, DeepSleepMode, IncrementAxis};
-use crate::display::epd_trait::{EpdDisplay, Ssd1683DisplayExt};
 use crate::display::epd::EpdInterface;
+use crate::display::epd_trait::EpdDisplay;
 use anyhow::Result;
 use esp_hal::delay::Delay;
 
@@ -278,7 +278,14 @@ impl EpdDisplay for Display {
         self.normal_update()
     }
 
-    fn write_partial(&mut self, x: u16, y: u16, width: u16, height: u16, data: &[u8]) -> Result<()> {
+    fn write_partial(
+        &mut self,
+        x: u16,
+        y: u16,
+        width: u16,
+        height: u16,
+        data: &[u8],
+    ) -> Result<()> {
         self.part_write(x, y, width, height, data)
     }
 
@@ -289,11 +296,5 @@ impl EpdDisplay for Display {
     fn deep_sleep(&mut self) -> Result<()> {
         // Use DiscardRAM as sensible default
         self.deep_sleep(DeepSleepMode::DiscardRAM)
-    }
-}
-
-impl Ssd1683DisplayExt for Display {
-    fn part_update(&mut self) -> Result<()> {
-        self.part_update()
     }
 }

@@ -75,7 +75,8 @@ pub trait EpdDisplay {
     /// # Note
     /// - SSD1683: Sets window and transfers data. You MUST call `update_partial()` after.
     /// - SSD2683: Completes entire partial update including power cycle.
-    fn write_partial(&mut self, x: u16, y: u16, width: u16, height: u16, data: &[u8]) -> Result<()>;
+    fn write_partial(&mut self, x: u16, y: u16, width: u16, height: u16, data: &[u8])
+    -> Result<()>;
 
     /// Trigger a partial display refresh.
     ///
@@ -87,26 +88,4 @@ pub trait EpdDisplay {
     /// Enter deep sleep mode.
     /// Call this before powering off the display.
     fn deep_sleep(&mut self) -> Result<()>;
-}
-
-/// SSD1683-specific display operations.
-pub trait Ssd1683DisplayExt {
-    /// Execute partial update (call AFTER write_partial).
-    fn part_update(&mut self) -> Result<()>;
-}
-
-/// SSD2683-specific display operations.
-pub trait Ssd2683DisplayExt {
-    /// Write monochrome data (all white or all black).
-    fn write_monochrome(&mut self, all_white: bool) -> Result<()>;
-
-    /// Fast white-to-A update using bit interleaving.
-    ///
-    /// # Parameters
-    /// - `current`: Current display data
-    /// - `new`: New data to display
-    ///
-    /// # Note
-    /// This uses bit-interleave algorithm for efficient partial updates.
-    fn fast_white_to_a(&mut self, current: &[u8], new: &[u8]) -> Result<()>;
 }

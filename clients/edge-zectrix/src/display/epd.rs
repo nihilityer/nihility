@@ -4,20 +4,11 @@ use esp_hal::gpio::{Input, Output};
 use esp_hal::spi::master::Spi;
 use esp_hal::Blocking;
 
-// Re-export trait and extension traits
-pub use super::epd_trait::{EpdDisplay, Ssd1683DisplayExt, Ssd2683DisplayExt};
-
 // Re-export the Display struct (feature-gated)
 #[cfg(feature = "ssd1683")]
 pub use ssd1683::Display;
 #[cfg(feature = "ssd2683")]
 pub use ssd2683::Display;
-
-// Re-export DeepSleepMode (feature-gated)
-#[cfg(feature = "ssd1683")]
-pub use ssd1683::DeepSleepMode;
-#[cfg(feature = "ssd2683")]
-pub use ssd2683::DeepSleepMode;
 
 #[cfg(feature = "ssd1683")]
 pub mod ssd1683;

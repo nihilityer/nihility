@@ -1,8 +1,7 @@
 use crate::display::epd::ssd2683::command::Command;
 use crate::display::epd::EpdInterface;
-use crate::display::epd_trait::{EpdDisplay, Ssd2683DisplayExt};
+use crate::display::epd_trait::EpdDisplay;
 use alloc::vec;
-use alloc::vec::Vec;
 use anyhow::{anyhow, Result};
 use esp_hal::delay::Delay;
 
@@ -127,99 +126,6 @@ impl Display {
         Ok(())
     }
 
-    /// 写入图像数据（正常刷新模式）
-    ///
-    /// # 参数
-    /// - `data`: 显示数据（长度必须等于 width * height / 8）
-    ///
-    /// # 数据格式
-    /// - 每个字节代表 8 个水平像素，MSB 在左侧
-    /// - 0 = 黑色，1 = 白色
-    pub fn write_all(&mut self, data: &[u8]) -> Result<()> {
-        let expected_len = self.width_bytes * self.height as usize;
-        if data.len() != expected_len {
-            panic!(
-                "Data length mismatch: expected {}, got {}",
-                expected_len,
-                data.len()
-            );
-        }
-
-        // 写入黑白数据
-        Command::WriteRamBW.execute(&mut self.interface)?;
-        self.interface.send_data(data)?;
-
-        // 写入红色数据（全白，即无红色）
-        Command::WriteRamRed.execute(&mut self.interface)?;
-        let white_data = vec![0xFFu8; expected_len];
-        self.interface.send_data(&white_data)?;
-
-        Ok(())
-    }
-
-    /// 快速白色到 A 刷新（使用位交叉）
-    ///
-    /// # 参数
-    /// - `current_data`: 当前显示的数据
-    /// - `new_data`: 要刷新的新数据
-    ///
-    /// # 说明
-    /// 使用 bitInterleave 函数对两个数据流进行位交叉处理
-    pub fn fast_white_to_a(&mut self, current_data: &[u8], new_data: &[u8]) -> Result<()> {
-        let expected_len = self.width_bytes * self.height as usize;
-        if current_data.len() != expected_len || new_data.len() != expected_len {
-            panic!("Data length mismatch");
-        }
-
-        Command::WriteRamBW.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-
-        // 位交叉写入
-        let mut interleaved = Vec::with_capacity(expected_len * 2);
-        for i in 0..expected_len {
-            let (byte0, byte1) = Self::bit_interleave(current_data[i], new_data[i]);
-            interleaved.push(byte0);
-            interleaved.push(byte1);
-        }
-        self.interface.send_data(&interleaved)?;
-
-        Command::PowerOn.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-        self.delay.delay_millis(10);
-
-        Command::DisplayRefresh.execute(&mut self.interface)?;
-        self.delay.delay_millis(10);
-        self.interface.busy_wait();
-
-        Command::PowerOff.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-        self.delay.delay_millis(20);
-
-        Ok(())
-    }
-
-    /// 位交叉处理
-    /// 将两个字节交织成一个16位值
-    ///
-    /// # 参数
-    /// - `byte1`: 第一个字节（当前显示数据）
-    /// - `byte2`: 第二个字节（要刷新的数据）
-    ///
-    /// # 返回
-    /// (高位字节, 低位字节)
-    fn bit_interleave(byte1: u8, byte2: u8) -> (u8, u8) {
-        let mut result: u16 = 0;
-
-        for i in 0..8 {
-            let bit1 = (byte1 >> (7 - i)) & 1;
-            let bit2 = (byte2 >> (7 - i)) & 1;
-            result |= (bit1 as u16) << (2 * (7 - i) + 1);
-            result |= (bit2 as u16) << (2 * (7 - i));
-        }
-
-        ((result >> 8) as u8, result as u8)
-    }
-
     /// 局部刷新
     ///
     /// # 参数
@@ -288,27 +194,6 @@ impl Display {
         // 发送深度睡眠密钥
         self.interface.send_data(&[0xA5])?;
         self.delay.delay_millis(100);
-        Ok(())
-    }
-
-    /// 写入单色数据（全白或全黑）
-    ///
-    /// # 参数
-    /// - `all_white`: true 表示全白，false 表示全黑
-    pub fn write_monochrome(&mut self, all_white: bool) -> Result<()> {
-        let expected_len = self.width_bytes * self.height as usize;
-        let data = if all_white {
-            vec![0xFFu8; expected_len]
-        } else {
-            vec![0x00u8; expected_len]
-        };
-
-        Command::WriteRamBW.execute(&mut self.interface)?;
-        self.interface.send_data(&data)?;
-
-        Command::WriteRamRed.execute(&mut self.interface)?;
-        self.interface.send_data(&data)?;
-
         Ok(())
     }
 
@@ -393,15 +278,5 @@ impl EpdDisplay for Display {
 
     fn deep_sleep(&mut self) -> Result<()> {
         self.deep_sleep()
-    }
-}
-
-impl Ssd2683DisplayExt for Display {
-    fn write_monochrome(&mut self, all_white: bool) -> Result<()> {
-        self.write_monochrome(all_white)
-    }
-
-    fn fast_white_to_a(&mut self, current: &[u8], new: &[u8]) -> Result<()> {
-        self.fast_white_to_a(current, new)
     }
 }
