@@ -1,10 +1,12 @@
 mod epd;
+mod epd_trait;
 
 use crate::display::epd::EpdInterface;
+use crate::display::epd_trait::EpdDisplay;
 use anyhow::Result;
 use core::cell::Cell;
 use critical_section::Mutex;
-use epd::ssd1683::{DeepSleepMode, Display};
+use epd::Display;
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig};
 use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO13, GPIO8, GPIO9, SPI3};
@@ -64,23 +66,23 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
             if count == 0 || count > MAX_FAST_UPDATES {
                 info!("normal full screen update");
                 // 初始化显示屏
-                if let Err(e) = display.normal_init() {
+                if let Err(e) = EpdDisplay::init(&mut display) {
                     error!("Failed to normal init display: {:?}", e);
                     DISPLAY.borrow(cs).replace(Some(display));
                     return Err(anyhow::anyhow!("Display init failed"));
                 }
             } else {
                 info!("fast full screen update");
-                // 快速刷新初始化
-                if let Err(e) = display.fast_init(false) {
+                // 快速刷新初始化 (use_otp = false for temperature LUT)
+                if let Err(e) = EpdDisplay::init_fast(&mut display, false) {
                     error!("Failed to fast init display: {:?}", e);
                     DISPLAY.borrow(cs).replace(Some(display));
                     return Err(anyhow::anyhow!("Display init failed"));
                 }
             }
 
-            // 写入完整屏幕数据
-            if let Err(e) = display.write_all(data) {
+            // 写入完整屏幕数据 (data for both B/W and red RAM)
+            if let Err(e) = EpdDisplay::write_all(&mut display, data, data) {
                 error!("Failed to write display data: {:?}", e);
                 DISPLAY.borrow(cs).replace(Some(display));
                 return Err(anyhow::anyhow!("Display write failed"));
@@ -89,7 +91,7 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
             if count == 0 || count > MAX_FAST_UPDATES {
                 count = 1;
                 // 执行正常更新
-                if let Err(e) = display.normal_update() {
+                if let Err(e) = EpdDisplay::update(&mut display) {
                     error!("Failed to normal update display: {:?}", e);
                     DISPLAY.borrow(cs).replace(Some(display));
                     return Err(anyhow::anyhow!("Display update failed"));
@@ -97,7 +99,7 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
             } else {
                 count += 1;
                 // 快速刷新
-                if let Err(e) = display.fast_update() {
+                if let Err(e) = EpdDisplay::update(&mut display) {
                     error!("Failed to fast update display: {:?}", e);
                     DISPLAY.borrow(cs).replace(Some(display));
                     return Err(anyhow::anyhow!("Display update failed"));
@@ -105,8 +107,8 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
             }
             UPDATE_COUNT.borrow(cs).set(count);
 
-            // 进入深度睡眠以节省电量，保留 RAM 内容
-            if let Err(e) = display.deep_sleep(DeepSleepMode::PreserveRAM) {
+            // 进入深度睡眠以节省电量
+            if let Err(e) = EpdDisplay::deep_sleep(&mut display) {
                 error!("Failed to enter deep sleep: {:?}", e);
                 DISPLAY.borrow(cs).replace(Some(display));
                 return Err(anyhow::anyhow!("Display deep sleep failed"));
@@ -133,7 +135,8 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
                 // 转换Y坐标
                 let ssd1683_y = HEIGHT - region.y - region.height;
 
-                if let Err(e) = display.part_write(
+                if let Err(e) = EpdDisplay::write_partial(
+                    &mut display,
                     region.x,
                     ssd1683_y,
                     region.width,
@@ -146,8 +149,9 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
                 }
             }
 
-            // 执行部分更新
-            if let Err(e) = display.part_update() {
+            // 执行部分更新 (SSD2683不需要，因为write_partial已包含)
+            #[cfg(feature = "ssd1683")]
+            if let Err(e) = EpdDisplay::update_partial(&mut display) {
                 error!("Failed to update display: {:?}", e);
                 DISPLAY.borrow(cs).replace(Some(display));
                 return Err(anyhow::anyhow!("Display part update failed"));

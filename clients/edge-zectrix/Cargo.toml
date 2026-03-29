@@ -88,6 +88,11 @@ edge-nal-embassy = { version = "0.8" }
 
 nihility-edge-protocol = { path = "../../crates/edge-protocol" }
 
+[features]
+default = ["ssd2683"]
+ssd2683 = []
+ssd1683 = []
+
 [profile.dev]
 # Rust debug is too slow.
 # For debug builds always builds with some optimization
