@@ -1,9 +1,39 @@
-use crate::display::epd::ssd2683::command::Command;
+use crate::display::epd::ssd2683::{Command, DeepSleepMode};
 use crate::display::epd::EpdInterface;
 use crate::display::epd_trait::EpdDisplay;
-use alloc::vec;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use esp_hal::delay::Delay;
+use log::debug;
+
+/// 将两个字节交织为 SSD2683 的 2BPP 格式
+///
+/// SSD2683 使用 2BPP（每像素2位）格式，每个字节表示4个像素：
+/// - 高4位: 像素0-3 (位6,7 = 像素0, 位4,5 = 像素1, 位2,3 = 像素2, 位0,1 = 像素3)
+/// - 低4位: 像素4-7
+///
+/// # 参数
+/// - `bytes1`: 前一帧数据（用于波形LUT计算）
+/// - `bytes2`: 当前帧数据
+///
+/// # 输出格式
+/// 每2位表示一个像素: [byte1_bit, byte2_bit] = 像素值
+/// - 00: 黑, 01: 红, 10: 浮/白, 11: 白
+fn bit_interleave(bytes1: u8, bytes2: u8) -> (u8, u8) {
+    let mut result: u16 = 0;
+
+    for i in 0..8 {
+        // 从 bytes1 取出第 (7-i) 位，放到 result 的第 (2*(7-i)+1) 位
+        let bit1 = (bytes1 >> (7 - i)) & 0x01;
+        result |= (bit1 as u16) << (2 * (7 - i) + 1);
+
+        // 从 bytes2 取出第 (7-i) 位，放到 result 的第 (2*(7-i)) 位
+        let bit2 = (bytes2 >> (7 - i)) & 0x01;
+        result |= (bit2 as u16) << (2 * (7 - i));
+    }
+
+    // 前4像素在高位，后4像素在低位
+    ((result >> 8) as u8, result as u8)
+}
 
 /// 基于数据驱动的 SSD2683 显示驱动
 /// 分辨率: 300x400
@@ -33,6 +63,7 @@ impl Display {
     /// 根据温度值获取 LUT 值
     /// 参考 C 代码中的温度查表
     fn get_temp_lut(&self, temp: u8) -> u8 {
+        debug!("get_temp_lut {}", temp);
         if temp <= 5 {
             232 // -24
         } else if temp <= 10 {
@@ -47,16 +78,10 @@ impl Display {
             232
         }
     }
+}
 
-    /// 读取温度传感器值
-    fn read_temperature(&mut self) -> Result<u8> {
-        Command::ReadTemperatureSensor.execute(&mut self.interface)?;
-        self.delay.delay_millis(10);
-        Ok(self.interface.receive_data()?)
-    }
-
-    /// OTP 初始化（用于快速刷新模式）
-    pub fn otp_init(&mut self) -> Result<()> {
+impl EpdDisplay for Display {
+    fn init(&mut self) -> Result<()> {
         // 硬件重置
         self.interface.reset(&self.delay)?;
         self.interface.busy_wait();
@@ -71,212 +96,130 @@ impl Display {
         Ok(())
     }
 
-    /// 全局正常刷新初始化
-    pub fn normal_init(&mut self) -> Result<()> {
-        // 硬件重置
-        self.interface.reset(&self.delay)?;
-        self.interface.busy_wait();
-
-        // Panel Setting
-        Command::PanelSetting(0x2F, 0x0E).execute(&mut self.interface)?;
-
-        // CDI 边框设置
-        Command::CdiBorder(0x77).execute(&mut self.interface)?;
-
-        // 温度 LUT 设置
-        Command::TemperatureWrite(0x02).execute(&mut self.interface)?;
-        let temp = self.read_temperature()?;
-        let temp_lut = self.get_temp_lut(temp);
-        Command::TemperatureLut(temp_lut).execute(&mut self.interface)?;
-
-        Ok(())
-    }
-
-    /// 执行正常刷新
-    pub fn normal_update(&mut self) -> Result<()> {
-        Command::PowerOn.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-        self.delay.delay_millis(10);
-
-        Command::DisplayRefresh.execute(&mut self.interface)?;
-        self.delay.delay_millis(10);
-        self.interface.busy_wait();
-
-        Command::PowerOff.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-        self.delay.delay_millis(20);
-
-        Ok(())
-    }
-
-    /// 执行快速刷新（使用 OTP 初始化）
-    pub fn fast_update(&mut self) -> Result<()> {
-        Command::PowerOn.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-        self.delay.delay_millis(10);
-
-        Command::DisplayRefresh.execute(&mut self.interface)?;
-        self.delay.delay_millis(10);
-        self.interface.busy_wait();
-
-        Command::PowerOff.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-        self.delay.delay_millis(20);
-
-        Ok(())
-    }
-
-    /// 局部刷新
-    ///
-    /// # 参数
-    /// - `x`: 起始 X 坐标（字节，8像素/字节）
-    /// - `y`: 起始 Y 坐标（像素）
-    /// - `width_bytes`: 区域宽度（字节）
-    /// - `height`: 区域高度（像素）
-    /// - `data`: 区域数据
-    pub fn part_write(
-        &mut self,
-        x: u8,
-        y: u16,
-        width_bytes: u8,
-        height: u16,
-        data: &[u8],
-    ) -> Result<()> {
-        let expected_len = width_bytes as usize * height as usize;
+    fn full_update(&mut self, data: &[u8]) -> Result<()> {
+        let expected_len = self.width_bytes * self.height as usize;
         if data.len() != expected_len {
             panic!(
-                "Region data length mismatch: expected {}, got {}",
+                "Data length mismatch: expected {}, got {}",
                 expected_len,
                 data.len()
             );
         }
 
-        let x_end = x + width_bytes - 1;
-        let y_start = y;
-        let y_end = y + height - 1;
+        // 读取温度传感器
+        self.interface.send_command(0x40)?;
+        self.interface.busy_wait();
+        let temp = self.interface.receive_data()?;
 
-        // 清空窗口
+        // 温度补偿
+        let temp_lut = self.get_temp_lut(temp);
+        Command::TemperatureWrite(0x02).execute(&mut self.interface)?;
+        Command::TemperatureLut(temp_lut).execute(&mut self.interface)?;
+
+        // 更新参数
+        self.interface.send_command(0xA5)?;
+        self.interface.busy_wait();
+        self.delay.delay_millis(10);
+
+        // 写入 RAM (2BPP 格式)
         Command::WriteRamBW.execute(&mut self.interface)?;
+        for &byte in data {
+            let (high, low) = bit_interleave(0xFF, byte);
+            self.interface.send_data(&[high, low])?;
+        }
+
+        // Power ON
+        Command::PowerOn.execute(&mut self.interface)?;
+        self.interface.busy_wait();
+        self.delay.delay_millis(10);
+
+        // Display Refresh
+        Command::DisplayRefresh.execute(&mut self.interface)?;
+        self.interface.send_data(&[0x00])?;
+        self.delay.delay_millis(10);
         self.interface.busy_wait();
 
-        // 清空整个显示区域
+        // Power OFF
+        Command::PowerOff.execute(&mut self.interface)?;
+        self.interface.send_data(&[0x00])?;
+        self.interface.busy_wait();
+        self.delay.delay_millis(20);
+
+        // 深度睡眠
+        Command::DeepSleepMode(DeepSleepMode::DiscardRAM).execute(&mut self.interface)?;
+        self.interface.send_data(&[0xA5])?;
+        self.delay.delay_millis(100);
+
+        Ok(())
+    }
+
+    fn partial_update(&mut self, x: u16, y: u16, w: u16, h: u16, data: &[u8]) -> Result<()> {
+        // 验证数据长度
+        let w_bytes = (w + 7) / 8; // 宽度字节数（向上取整）
+        let expected_len = w_bytes as usize * h as usize;
+        if data.len() != expected_len {
+            panic!(
+                "Data length mismatch: expected {} (w_bytes={}, h={}), got {}",
+                expected_len,
+                w_bytes,
+                h,
+                data.len()
+            );
+        }
+
+        // 1. 清空全屏数据
+        Command::WriteRamBW.execute(&mut self.interface)?;
+        self.interface.busy_wait();
         for _ in 0..self.height as usize {
             for _ in 0..self.width_bytes {
                 self.interface.send_data(&[0x00])?;
             }
         }
 
-        // 设置局部刷新窗口
-        Command::StartEndXPosition(x, x_end).execute(&mut self.interface)?;
-        Command::StartEndYPosition(y_end, y_start).execute(&mut self.interface)?;
+        // 2. 设置局部刷新窗口
+        let x_end = x + w - 1;
+        let y_end = y + h - 1;
+        Command::SetPartialWindow {
+            hrst_h: 0x00,
+            hrst_l: x as u8,
+            hred_h: 0x00,
+            hred_l: x_end as u8,
+            vrst_h: ((y >> 8) & 0x03) as u8,
+            vrst_l: (y & 0xFF) as u8,
+            vred_h: ((y_end >> 8) & 0x03) as u8,
+            vred_l: (y_end & 0xFF) as u8,
+            trigger: 0x01,
+        }
+        .execute(&mut self.interface)?;
 
-        // 写入新数据
+        // 3. 写入局部数据
         Command::WriteRamBW.execute(&mut self.interface)?;
-        self.interface.send_data(data)?;
+        self.interface.busy_wait();
+        for &byte in data {
+            let (high, low) = bit_interleave(0xFF, byte);
+            self.interface.send_data(&[high, low])?;
+        }
 
+        // 4. Power ON
         Command::PowerOn.execute(&mut self.interface)?;
         self.interface.busy_wait();
 
+        // 5. Display Refresh
         Command::DisplayRefresh.execute(&mut self.interface)?;
+        self.interface.send_data(&[0x00])?;
         self.interface.busy_wait();
 
+        // 6. Power OFF
         Command::PowerOff.execute(&mut self.interface)?;
+        self.interface.send_data(&[0x00])?;
         self.interface.busy_wait();
         self.delay.delay_millis(20);
 
-        Ok(())
-    }
-
-    /// 深度睡眠模式
-    pub fn deep_sleep(&mut self) -> Result<()> {
-        Command::DeepSleepMode(crate::display::epd::ssd2683::command::DeepSleepMode::DiscardRAM)
-            .execute(&mut self.interface)?;
-        // 发送深度睡眠密钥
+        // 7. 深度睡眠
+        Command::DeepSleepMode(DeepSleepMode::DiscardRAM).execute(&mut self.interface)?;
         self.interface.send_data(&[0xA5])?;
         self.delay.delay_millis(100);
-        Ok(())
-    }
-
-    /// 写入图像数据（适配 Display trait 的双参数版本）
-    ///
-    /// # 参数
-    /// - `bw`: 黑白数据
-    /// - `_red`: 红色数据（SSD2683 忽略此参数，始终写 0xFF）
-    pub fn write_all_with_red(&mut self, bw: &[u8], _red: &[u8]) -> Result<()> {
-        let expected_len = self.width_bytes * self.height as usize;
-        if bw.len() != expected_len {
-            panic!(
-                "Data length mismatch: expected {}, got {}",
-                expected_len,
-                bw.len()
-            );
-        }
-
-        Command::WriteRamBW.execute(&mut self.interface)?;
-        self.interface.send_data(bw)?;
-
-        // SSD2683 always writes white to red RAM
-        let white_data = vec![0xFFu8; expected_len];
-        Command::WriteRamRed.execute(&mut self.interface)?;
-        self.interface.send_data(&white_data)?;
 
         Ok(())
-    }
-}
-
-impl EpdDisplay for Display {
-    fn width(&self) -> usize {
-        self.width_bytes * 8
-    }
-
-    fn height(&self) -> u16 {
-        self.height
-    }
-
-    fn init(&mut self) -> Result<()> {
-        self.normal_init()
-    }
-
-    fn init_fast(&mut self, use_otp: bool) -> Result<()> {
-        if use_otp {
-            // SSD2683_Init_For_OTP from C++ reference: otp_init + normal_init
-            self.otp_init()?;
-            self.normal_init()
-        } else {
-            self.normal_init()
-        }
-    }
-
-    fn write_all(&mut self, black_white: &[u8], red: &[u8]) -> Result<()> {
-        self.write_all_with_red(black_white, red)
-    }
-
-    fn update(&mut self) -> Result<()> {
-        self.normal_update()
-    }
-
-    fn write_partial(
-        &mut self,
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        data: &[u8],
-    ) -> Result<()> {
-        // Convert pixel coordinates to byte coordinates
-        let x_bytes = (x / 8) as u8;
-        let width_bytes = (width / 8) as u8;
-        self.part_write(x_bytes, y, width_bytes, height, data)
-    }
-
-    fn update_partial(&mut self) -> Result<()> {
-        // SSD2683 write_partial already includes power cycle, not applicable
-        Err(anyhow!(
-            "SSD2683 does not need update_partial - write_partial already includes refresh"
-        ))
-    }
-
-    fn deep_sleep(&mut self) -> Result<()> {
-        self.deep_sleep()
     }
 }

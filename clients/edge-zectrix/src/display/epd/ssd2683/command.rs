@@ -126,6 +126,20 @@ pub enum Command {
     OtpInitControl,
     /// 0x7F: NOP
     Nop,
+    /// 0x83: 设置局部刷新窗口
+    /// HRST[9:8], HRST[7:2], HRED[9:8], HRED[7:2],
+    /// VRST[9:8], VRST[7:2], VRED[9:8], VRED[7:2], trigger
+    SetPartialWindow {
+        hrst_h: u8,
+        hrst_l: u8,
+        hred_h: u8,
+        hred_l: u8,
+        vrst_h: u8,
+        vrst_l: u8,
+        vred_h: u8,
+        vred_l: u8,
+        trigger: u8,
+    },
 }
 
 impl Command {
@@ -183,6 +197,24 @@ impl Command {
             TemperatureLut(temp) => pack!(buf, 0xE6, [temp]),
             OtpInitControl => pack!(buf, 0xE9, [0x01]),
             Nop => pack!(buf, 0x7F, []),
+            SetPartialWindow {
+                hrst_h,
+                hrst_l,
+                hred_h,
+                hred_l,
+                vrst_h,
+                vrst_l,
+                vred_h,
+                vred_l,
+                trigger,
+            } => {
+                // 0x83 命令需要 9 个数据字节，超出 pack! 宏支持范围
+                interface.send_command(0x83)?;
+                interface.send_data(&[
+                    hrst_h, hrst_l, hred_h, hred_l, vrst_h, vrst_l, vred_h, vred_l, trigger,
+                ])?;
+                return Ok(());
+            }
         };
 
         interface.send_command(command)?;

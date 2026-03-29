@@ -4,12 +4,16 @@ use crate::display::epd_trait::EpdDisplay;
 use anyhow::Result;
 use esp_hal::delay::Delay;
 
+const MAX_FAST_UPDATES: usize = 10;
+
 /// 基于数据驱动的显示驱动
 pub struct Display {
     interface: EpdInterface,
     delay: Delay,
     width: usize,
     height: u16,
+    update_count: usize,
+    use_fast_mode: bool,
 }
 
 impl Display {
@@ -23,11 +27,13 @@ impl Display {
             delay,
             width,
             height,
+            update_count: 0,
+            use_fast_mode: false,
         }
     }
 
     /// 全局正常刷新初始化
-    pub fn normal_init(&mut self) -> Result<()> {
+    pub(crate) fn normal_init(&mut self) -> Result<()> {
         // 硬件重置
         self.interface.reset(&self.delay)?;
         self.interface.busy_wait();
@@ -60,7 +66,7 @@ impl Display {
 
     /// 全局快速刷新初始化
     /// more_fast为true时，大约1.0s,反之1.5s
-    pub fn fast_init(&mut self, more_fast: bool) -> Result<()> {
+    pub(crate) fn fast_init(&mut self, more_fast: bool) -> Result<()> {
         // 硬件重置
         self.interface.reset(&self.delay)?;
         self.interface.busy_wait();
@@ -105,7 +111,7 @@ impl Display {
     }
 
     /// 执行全局正常刷新
-    pub fn normal_update(&mut self) -> Result<()> {
+    pub(crate) fn normal_update(&mut self) -> Result<()> {
         Command::DisplayUpdateControl2(0xF7).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
         self.interface.busy_wait();
@@ -113,7 +119,7 @@ impl Display {
     }
 
     /// 执行全局快速刷新
-    pub fn fast_update(&mut self) -> Result<()> {
+    pub(crate) fn fast_update(&mut self) -> Result<()> {
         Command::DisplayUpdateControl2(0xC7).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
         self.interface.busy_wait();
@@ -121,7 +127,7 @@ impl Display {
     }
 
     /// 执行局部刷新
-    pub fn part_update(&mut self) -> Result<()> {
+    pub(crate) fn part_update(&mut self) -> Result<()> {
         Command::DisplayUpdateControl2(0xFF).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
         self.interface.busy_wait();
@@ -136,7 +142,7 @@ impl Display {
     /// # 数据格式
     /// - 每个字节代表 8 个水平像素，LSB 在右侧
     /// - 0 = 黑色，1 = 白色
-    pub fn write_all(&mut self, data: &[u8]) -> Result<()> {
+    pub(crate) fn write_all(&mut self, data: &[u8]) -> Result<()> {
         let expected_len = (self.width * self.height as usize) / 8;
         if data.len() != expected_len {
             panic!(
@@ -173,7 +179,7 @@ impl Display {
     /// # 注意
     /// - 局部刷新适合小范围更新，速度最快
     /// - 长期使用可能产生残影，建议定期执行全屏正常刷新
-    pub fn part_write(
+    pub(crate) fn part_write(
         &mut self,
         x: u16,
         y: u16,
@@ -225,7 +231,7 @@ impl Display {
     }
 
     /// 手动进入深度睡眠模式
-    pub fn deep_sleep(&mut self, mode: DeepSleepMode) -> Result<()> {
+    pub(crate) fn deep_sleep(&mut self, mode: DeepSleepMode) -> Result<()> {
         Command::DeepSleepMode(mode).execute(&mut self.interface)?;
         self.delay.delay_millis(100);
         Ok(())
@@ -236,7 +242,7 @@ impl Display {
     /// # 参数
     /// - `bw`: 黑白数据
     /// - `red`: 红色数据
-    pub fn write_all_with_red(&mut self, bw: &[u8], red: &[u8]) -> Result<()> {
+    pub(crate) fn write_all_with_red(&mut self, bw: &[u8], red: &[u8]) -> Result<()> {
         let expected_len = (self.width * self.height as usize) / 8;
         if bw.len() != expected_len || red.len() != expected_len {
             panic!("Data length mismatch");
@@ -253,48 +259,29 @@ impl Display {
 }
 
 impl EpdDisplay for Display {
-    fn width(&self) -> usize {
-        self.width
-    }
-
-    fn height(&self) -> u16 {
-        self.height
-    }
-
     fn init(&mut self) -> Result<()> {
-        self.normal_init()
+        if self.update_count > 0 && self.update_count <= MAX_FAST_UPDATES {
+            self.use_fast_mode = !self.use_fast_mode;
+            self.fast_init(!self.use_fast_mode)
+        } else {
+            self.use_fast_mode = false;
+            self.normal_init()
+        }
     }
 
-    fn init_fast(&mut self, use_otp: bool) -> Result<()> {
-        // SSD1683: use_otp=false means more_fast=true, use_otp=true means more_fast=false
-        self.fast_init(!use_otp)
+    fn full_update(&mut self, data: &[u8]) -> Result<()> {
+        self.init()?;
+        self.write_all(data)?;
+        self.normal_update()?;
+        self.deep_sleep(DeepSleepMode::DiscardRAM)?;
+        self.update_count += 1;
+        self.use_fast_mode = true;
+        Ok(())
     }
 
-    fn write_all(&mut self, black_white: &[u8], red: &[u8]) -> Result<()> {
-        self.write_all_with_red(black_white, red)
-    }
-
-    fn update(&mut self) -> Result<()> {
-        self.normal_update()
-    }
-
-    fn write_partial(
-        &mut self,
-        x: u16,
-        y: u16,
-        width: u16,
-        height: u16,
-        data: &[u8],
-    ) -> Result<()> {
-        self.part_write(x, y, width, height, data)
-    }
-
-    fn update_partial(&mut self) -> Result<()> {
-        self.part_update()
-    }
-
-    fn deep_sleep(&mut self) -> Result<()> {
-        // Use DiscardRAM as sensible default
-        self.deep_sleep(DeepSleepMode::DiscardRAM)
+    fn partial_update(&mut self, x: u16, y: u16, w: u16, h: u16, data: &[u8]) -> Result<()> {
+        self.part_write(x, y, w, h, data)?;
+        self.part_update()?;
+        Ok(())
     }
 }
