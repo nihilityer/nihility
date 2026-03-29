@@ -153,7 +153,15 @@ impl EpdDisplay for Display {
         Ok(())
     }
 
-    fn partial_update(&mut self, x: u16, y: u16, w: u16, h: u16, data: &[u8]) -> Result<()> {
+    fn partial_update(
+        &mut self,
+        x: u16,
+        y: u16,
+        w: u16,
+        h: u16,
+        data: &[u8],
+        prev_data: &[u8],
+    ) -> Result<()> {
         // 验证数据长度
         let w_bytes = (w + 7) / 8; // 宽度字节数（向上取整）
         let expected_len = w_bytes as usize * h as usize;
@@ -166,17 +174,15 @@ impl EpdDisplay for Display {
                 data.len()
             );
         }
-
-        // 1. 清空全屏数据
-        Command::WriteRamBW.execute(&mut self.interface)?;
-        self.interface.busy_wait();
-        for _ in 0..self.height as usize {
-            for _ in 0..self.width_bytes {
-                self.interface.send_data(&[0x00])?;
-            }
+        if prev_data.len() != expected_len {
+            panic!(
+                "Previous data length mismatch: expected {}, got {}",
+                expected_len,
+                prev_data.len()
+            );
         }
 
-        // 2. 设置局部刷新窗口
+        // 设置局部刷新窗口
         let x_end = x + w - 1;
         let y_end = y + h - 1;
         Command::SetPartialWindow {
@@ -192,30 +198,30 @@ impl EpdDisplay for Display {
         }
         .execute(&mut self.interface)?;
 
-        // 3. 写入局部数据
+        // 写入局部数据，使用实际的前一帧数据进行波形LUT计算
         Command::WriteRamBW.execute(&mut self.interface)?;
         self.interface.busy_wait();
-        for &byte in data {
-            let (high, low) = bit_interleave(0xFF, byte);
+        for i in 0..data.len() {
+            let (high, low) = bit_interleave(prev_data[i], data[i]);
             self.interface.send_data(&[high, low])?;
         }
 
-        // 4. Power ON
+        // Power ON
         Command::PowerOn.execute(&mut self.interface)?;
         self.interface.busy_wait();
 
-        // 5. Display Refresh
+        // Display Refresh
         Command::DisplayRefresh.execute(&mut self.interface)?;
         self.interface.send_data(&[0x00])?;
         self.interface.busy_wait();
 
-        // 6. Power OFF
+        // Power OFF
         Command::PowerOff.execute(&mut self.interface)?;
         self.interface.send_data(&[0x00])?;
         self.interface.busy_wait();
         self.delay.delay_millis(20);
 
-        // 7. 深度睡眠
+        // 深度睡眠
         Command::DeepSleepMode(DeepSleepMode::DiscardRAM).execute(&mut self.interface)?;
         self.interface.send_data(&[0xA5])?;
         self.delay.delay_millis(100);

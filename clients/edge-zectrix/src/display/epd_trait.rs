@@ -15,5 +15,16 @@ pub trait EpdDisplay {
     /// Partial update: write partial region data and refresh.
     /// For SSD1683: writes data then triggers refresh
     /// For SSD2683: write_partial already includes refresh
-    fn partial_update(&mut self, x: u16, y: u16, width: u16, height: u16, data: &[u8]) -> Result<()>;
+    ///
+    /// `prev_data` is the previous frame data for the region being updated.
+    /// It is used to calculate the correct waveform LUT for pixel transitions.
+    fn partial_update(
+        &mut self,
+        x: u16,
+        y: u16,
+        width: u16,
+        height: u16,
+        data: &[u8],
+        prev_data: &[u8],
+    ) -> Result<()>;
 }

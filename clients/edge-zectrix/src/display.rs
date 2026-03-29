@@ -3,8 +3,9 @@ mod epd_trait;
 
 use crate::display::epd::EpdInterface;
 use crate::display::epd_trait::EpdDisplay;
+use alloc::vec::Vec;
 use anyhow::Result;
-use core::cell::Cell;
+use core::cell::{Cell, RefCell};
 use critical_section::Mutex;
 use epd::Display;
 use esp_hal::delay::Delay;
@@ -18,6 +19,11 @@ use nihility_edge_protocol::UpdateRegion;
 
 const WIDTH: u16 = 400;
 const HEIGHT: u16 = 300;
+const FRAME_SIZE: usize = (WIDTH as usize * HEIGHT as usize) / 8;
+
+/// 帧缓存，用于局部刷新时保存前一帧数据
+static FRAME_BUFFER: Mutex<RefCell<[u8; FRAME_SIZE]>> =
+    Mutex::new(RefCell::new([0xFF; FRAME_SIZE]));
 
 static DISPLAY: Mutex<Cell<Option<Display>>> = Mutex::new(Cell::new(None));
 
@@ -71,6 +77,9 @@ pub fn full_screen_update(data: &[u8]) -> Result<()> {
                 return Err(anyhow::anyhow!("Display update failed"));
             }
 
+            // 更新帧缓存
+            FRAME_BUFFER.borrow(cs).borrow_mut().copy_from_slice(data);
+
             DISPLAY.borrow(cs).replace(Some(display));
             Ok(())
         } else {
@@ -91,7 +100,32 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
                 return Err(anyhow::anyhow!("Display init failed"));
             }
 
+            let mut frame = FRAME_BUFFER.borrow(cs).borrow_mut();
+            let width_bytes = WIDTH as usize / 8;
+
             for (i, region) in regions.iter().enumerate() {
+                // 从帧缓存中提取局部区域的前一帧数据
+                let w_bytes = ((region.width + 7) / 8) as usize;
+                let h = region.height as usize;
+                let expected_len = w_bytes * h;
+
+                // 栈上分配临时数组
+                let mut prev_data = Vec::new_in(esp_alloc::ExternalMemory);
+                prev_data.resize(expected_len, 0);
+
+                // 计算区域在帧缓存中的偏移
+                let start_byte = (region.y as usize * width_bytes) + (region.x as usize / 8);
+
+                for row in 0..h {
+                    let src_offset = start_byte + row * width_bytes;
+                    let dst_offset = row * w_bytes;
+
+                    // 提取区域数据
+                    for j in 0..w_bytes {
+                        prev_data[dst_offset + j] = frame[src_offset + j];
+                    }
+                }
+
                 if let Err(e) = EpdDisplay::partial_update(
                     &mut display,
                     region.x,
@@ -99,10 +133,20 @@ pub fn incremental_screen_update(regions: &[UpdateRegion]) -> Result<()> {
                     region.width,
                     region.height,
                     &region.data,
+                    &prev_data[..expected_len],
                 ) {
                     error!("Failed to update region {}: {:?}", i, e);
                     DISPLAY.borrow(cs).replace(Some(display));
                     return Err(anyhow::anyhow!("Display partial update failed"));
+                }
+
+                // 更新帧缓存中的局部区域数据
+                for row in 0..h {
+                    let dst_offset = start_byte + row * width_bytes;
+                    let src_offset = row * w_bytes;
+                    for j in 0..w_bytes {
+                        frame[dst_offset + j] = region.data[src_offset + j];
+                    }
                 }
             }
 

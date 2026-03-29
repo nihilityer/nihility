@@ -279,7 +279,15 @@ impl EpdDisplay for Display {
         Ok(())
     }
 
-    fn partial_update(&mut self, x: u16, y: u16, w: u16, h: u16, data: &[u8]) -> Result<()> {
+    fn partial_update(
+        &mut self,
+        x: u16,
+        y: u16,
+        w: u16,
+        h: u16,
+        data: &[u8],
+        _prev_data: &[u8],
+    ) -> Result<()> {
         self.part_write(x, y, w, h, data)?;
         self.part_update()?;
         Ok(())
