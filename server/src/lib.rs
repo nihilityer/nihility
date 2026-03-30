@@ -71,7 +71,7 @@ pub async fn start_server(config: ServerConfig) -> Result<()> {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            addr: "127.0.0.1".to_string(),
+            addr: "0.0.0.0".to_string(),
             port: 8080,
             jwt_secret: generate_secret(26),
             jwt_expiration: 60 * 24 * 7,

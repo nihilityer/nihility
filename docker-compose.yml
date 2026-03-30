@@ -1,0 +1,9 @@
+services:
+  nihility:
+    build: .
+    network_mode: host
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai

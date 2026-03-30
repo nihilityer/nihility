@@ -89,7 +89,7 @@ name = "nihility-server"
 path = "src/server.rs"
 
 [features]
-default = ["sqlite"]
+default = ["sqlite", "postgres"]
 sqlite = ["nihility-server/sqlite"]
 postgres = ["nihility-server/postgres"]
 

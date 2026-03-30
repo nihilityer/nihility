@@ -39,6 +39,7 @@ impl BrowserControl {
                 is_landscape: false,
                 has_touch: false,
             })
+            .no_sandbox()
             .new_headless_mode()
             .build()
             .map_err(BrowserControlError::BuildConfig)?;
