@@ -83,8 +83,8 @@ pub async fn get_config_with_db<T>(
 where
     T: Serialize + DeserializeOwned + Default + JsonSchema,
 {
-    if let Ok(config) = get_config::<T>(module_name) {
-        return Ok(config);
+    if check_config_exists(module_name)? {
+        return get_config(module_name);
     }
     let entity_result = nihility_server_entity::module_config::Entity::find()
         .filter(nihility_server_entity::module_config::Column::ModuleName.eq(module_name))
@@ -154,4 +154,13 @@ fn init_base_path<P: AsRef<Path>>(path: P) -> Result<(), ConfigError> {
         fs::create_dir(path)?;
     }
     Ok(())
+}
+
+fn check_config_exists(module_name: &str) -> Result<bool, ConfigError> {
+    let base_path = option_env!("NIHILITY_CONFIG_PATH").unwrap_or_else(|| DEFAULT_BASE_PATH);
+    let prefix = format!("{}/{}", base_path, module_name);
+    Ok(
+        Path::try_exists(format!("{}.{}", prefix, TOML_SUFFIX).as_ref())?
+            || Path::try_exists(format!("{}.{}", prefix, JSON_SUFFIX).as_ref())?,
+    )
 }
