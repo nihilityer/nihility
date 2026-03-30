@@ -1,9 +1,11 @@
 services:
   nihility:
     image: ghcr.io/nihilityer/nihility:main
+    #    build: .
     network_mode: host
     volumes:
       - ./config:/app/config
+      - ./chromium:/app/chromium
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai

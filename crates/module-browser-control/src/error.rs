@@ -6,6 +6,8 @@ pub enum BrowserControlError {
     Config(#[from] nihility_config::ConfigError),
     #[error("Build browser config failed with {0}")]
     BuildConfig(String),
+    #[error("Download browser failed with {0}")]
+    Download(#[from] chromiumoxide::fetcher::FetcherError),
     #[error("Operation error: {0}")]
     Operation(String),
     #[error(transparent)]

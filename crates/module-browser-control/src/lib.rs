@@ -2,6 +2,7 @@ pub mod error;
 pub mod func;
 
 use crate::error::*;
+use chromiumoxide::fetcher::{BrowserFetcher, BrowserFetcherOptions};
 use chromiumoxide::handler::viewport::Viewport;
 use chromiumoxide::{Browser, BrowserConfig, Page};
 use futures::StreamExt;
@@ -14,6 +15,7 @@ use uuid::Uuid;
 pub struct BrowserControlConfig {
     pub viewport_width: u32,
     pub viewport_height: u32,
+    pub chromium_path: Option<String>,
 }
 
 pub struct BrowserControl {
@@ -40,9 +42,28 @@ impl BrowserControl {
                 has_touch: false,
             })
             .no_sandbox()
-            .new_headless_mode()
-            .build()
-            .map_err(BrowserControlError::BuildConfig)?;
+            .new_headless_mode();
+
+        let browser_config = if let Some(download_path) = config.chromium_path {
+            tokio::fs::create_dir_all(&download_path).await.ok();
+
+            let options = BrowserFetcherOptions::builder()
+                .with_path(&download_path)
+                .build()
+                .map_err(|e| BrowserControlError::BuildConfig(e.to_string()))?;
+            let fetcher = BrowserFetcher::new(options);
+
+            let info = fetcher.fetch().await?;
+
+            browser_config
+                .chrome_executable(info.executable_path)
+                .build()
+                .map_err(BrowserControlError::BuildConfig)?
+        } else {
+            browser_config
+                .build()
+                .map_err(BrowserControlError::BuildConfig)?
+        };
 
         let (browser, mut handler) = Browser::launch(browser_config).await?;
         info!("Browser control initialized");
@@ -67,6 +88,7 @@ impl Default for BrowserControlConfig {
         Self {
             viewport_width: 400,
             viewport_height: 300,
+            chromium_path: Some("chromium".to_string()),
         }
     }
 }

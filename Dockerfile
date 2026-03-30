@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # Stage 2: Runtime - 使用最小镜像
 FROM debian:trixie-slim
 
-# 安装运行时依赖（包含 Chrome 运行所需库和 mDNS 支持）
+# 安装运行时依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -46,9 +46,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpangocairo-1.0-0 \
     fonts-liberation \
     xdg-utils \
-    && curl -fsSL https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -o /chrome.deb \
-    && dpkg -i /chrome.deb || apt-get install -f -y \
-    && rm /chrome.deb \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -62,14 +59,9 @@ RUN mkdir -p /app/config
 
 # 创建非 root 用户并设置权限
 RUN groupadd --gid 1000 nihility && \
-    useradd --uid 1000 --gid nihility --shell /bin/false --create-home --home-dir /home/nihility nihility && \
+    useradd --uid 1000 --gid nihility --shell /bin/sh --create-home --home-dir /home/nihility nihility && \
     chown -R nihility:nihility /app
 
-# 环境变量
-ENV NIHILITY_CONFIG_PATH=/app/config
-ENV RUST_LOG=info
-
-# 使用 config volume 挂载
 VOLUME ["/app/config"]
 
 USER nihility
