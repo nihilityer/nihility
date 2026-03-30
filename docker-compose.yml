@@ -1,6 +1,6 @@
 services:
   nihility:
-    build: .
+    image: ghcr.io/nihilityer/nihility:main
     network_mode: host
     volumes:
       - ./config:/app/config
