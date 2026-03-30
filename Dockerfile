@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /build
 
 # 复制源代码
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 COPY crates/ ./crates/
 COPY server/ ./server/
 COPY src/ ./src/
