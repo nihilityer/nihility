@@ -9,8 +9,10 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20260306_121657_html_pages::Migration),
             Box::new(m20260309_104447_user::Migration),
+            Box::new(m20260330_000001_module_config::Migration),
         ]
     }
 }
 mod m20260306_121657_html_pages;
 mod m20260309_104447_user;
+mod m20260330_000001_module_config;

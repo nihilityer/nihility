@@ -3,15 +3,18 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "html_pages")]
+#[sea_orm(table_name = "module_config")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     #[sea_orm(unique)]
-    pub path: String,
-    #[sea_orm(column_type = "Text")]
-    pub html: String,
-    pub update_at: DateTimeWithTimeZone,
+    pub module_name: String,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub config_value: Json,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub json_schema: Json,
+    pub created_at: DateTimeWithTimeZone,
+    pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

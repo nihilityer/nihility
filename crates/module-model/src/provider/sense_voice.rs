@@ -15,7 +15,7 @@ use tokio::sync::Mutex;
 use tracing::debug;
 
 /// SenseVoice模型初始化配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SenseVoiceConfig {
     /// onnx模型路径
     pub model_path: String,
@@ -57,7 +57,7 @@ pub struct SenseVoice {
     tokenizer: Tokenizer,
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum SenseVoiceLanguage {
     Auto = 0,
     Zh = 3,
@@ -68,7 +68,7 @@ pub enum SenseVoiceLanguage {
     NoSpeech = 13,
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum SenseVoiceTextNorm {
     WithItn = 14,
     WoItn = 15,

@@ -53,8 +53,7 @@ pub async fn start_server(config: ServerConfig) -> Result<()> {
 
     let jwt = JwtKeys::new(config.jwt_secret.as_bytes(), config.jwt_expiration);
 
-    // 初始化模块管理器
-    let module_manager = Arc::new(ModuleManager::init_from_file_config().await?);
+    let module_manager = Arc::new(ModuleManager::init_from_file_config(conn.clone()).await?);
 
     let state = AppState {
         conn,

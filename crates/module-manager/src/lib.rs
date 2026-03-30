@@ -2,6 +2,7 @@ pub mod error;
 
 use crate::error::*;
 use nihility_module::{BoxStream, FunctionMetadata, Module};
+use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -41,17 +42,19 @@ pub struct ModuleManagerConfig {
 
 pub struct ModuleManager {
     modules: HashMap<ModuleType, Arc<RwLock<dyn Module + Send + Sync>>>,
+    conn: DatabaseConnection,
 }
 
 impl ModuleManager {
-    pub async fn init_from_file_config() -> Result<Self> {
-        Self::init(nihility_config::get_config::<ModuleManagerConfig>(env!(
-            "CARGO_PKG_NAME"
-        ))?)
+    pub async fn init_from_file_config(conn: DatabaseConnection) -> Result<Self> {
+        Self::init(
+            nihility_config::get_config::<ModuleManagerConfig>(env!("CARGO_PKG_NAME"))?,
+            conn,
+        )
         .await
     }
 
-    pub async fn init(mut config: ModuleManagerConfig) -> Result<Self> {
+    pub async fn init(mut config: ModuleManagerConfig, conn: DatabaseConnection) -> Result<Self> {
         config = config.sorted();
         let mut modules: HashMap<ModuleType, Arc<RwLock<dyn Module + Send + Sync>>> =
             HashMap::new();
@@ -62,68 +65,89 @@ impl ModuleManager {
 
         for enable_module in config.enable_modules {
             match enable_module {
-                ModuleType::Embed(embed_module) => {
-                    match embed_module {
-                        EmbedModule::BrowserControl => {
-                            let module = Arc::new(RwLock::new(nihility_module_browser_control::BrowserControl::init_from_file_config().await?));
-                            browser_control = Some(module.clone());
-                            modules.insert(ModuleType::Embed(embed_module), module);
-                        }
-                        EmbedModule::Audio => {
-                            let module = nihility_module_audio::AudioModule::init_from_file_config().await?;
-                            audio_module = Some(Arc::new(module));
-                        }
-                        EmbedModule::Model => {
-                            let mut module = nihility_module_model::ModelModule::init_from_file_config().await?;
-                            if let Some(audio) = audio_module.as_ref() {
-                                module.set_audio_module(audio.clone());
-                            } else {
-                                error!(
-                                    "audio module does not exist for module type: {:?}",
-                                    embed_module
-                                );
-                            }
-                            model_module = Some(Arc::new(RwLock::new(module)));
-                        }
-                        EmbedModule::EdgeDeviceControl => {
-                            let mut module = nihility_module_edge_device_control::EdgeDeviceControl::init_from_file_config().await?;
-                            if let Some(browser_control) = browser_control.as_ref() {
-                                module.set_browser_control(browser_control.clone());
-                            } else {
-                                error!(
-                                    "browser_control module does not exist for module type: {:?}",
-                                    embed_module
-                                );
-                            }
-                            if let Some(audio) = audio_module.as_ref() {
-                                module.set_audio_module(audio.clone());
-                            } else {
-                                error!(
-                                    "audio module does not exist for module type: {:?}",
-                                    embed_module
-                                );
-                            }
-                            if let Some(model) = model_module.as_ref() {
-                                module.set_model_module(model.clone());
-                            } else {
-                                error!(
-                                    "model module does not exist for module type: {:?}",
-                                    embed_module
-                                );
-                            }
-                            modules.insert(
-                                ModuleType::Embed(embed_module),
-                                Arc::new(RwLock::new(module)),
+                ModuleType::Embed(embed_module) => match embed_module {
+                    EmbedModule::BrowserControl => {
+                        let config =
+                            nihility_config::get_config_with_db::<
+                                nihility_module_browser_control::BrowserControlConfig,
+                            >("nihility-module-browser-control", &conn)
+                            .await?;
+                        let module = Arc::new(RwLock::new(
+                            nihility_module_browser_control::BrowserControl::init(config).await?,
+                        ));
+                        browser_control = Some(module.clone());
+                        modules.insert(ModuleType::Embed(embed_module), module);
+                    }
+                    EmbedModule::Audio => {
+                        let config = nihility_config::get_config_with_db::<
+                            nihility_module_audio::AudioConfig,
+                        >("nihility-module-audio", &conn)
+                        .await?;
+                        let module = nihility_module_audio::AudioModule::init(config).await?;
+                        audio_module = Some(Arc::new(module));
+                    }
+                    EmbedModule::Model => {
+                        let config = nihility_config::get_config_with_db::<
+                            nihility_module_model::ModelConfig,
+                        >("nihility-module-model", &conn)
+                        .await?;
+                        let mut module = nihility_module_model::ModelModule::init(config).await?;
+                        if let Some(audio) = audio_module.as_ref() {
+                            module.set_audio_module(audio.clone());
+                        } else {
+                            error!(
+                                "audio module does not exist for module type: {:?}",
+                                embed_module
                             );
                         }
+                        model_module = Some(Arc::new(RwLock::new(module)));
                     }
-                }
+                    EmbedModule::EdgeDeviceControl => {
+                        let config = nihility_config::get_config_with_db::<
+                            nihility_module_edge_device_control::EdgeDeviceControlConfig,
+                        >(
+                            "nihility-module-edge-device-control", &conn
+                        )
+                        .await?;
+                        let mut module =
+                            nihility_module_edge_device_control::EdgeDeviceControl::init(config)
+                                .await?;
+                        if let Some(browser_control) = browser_control.as_ref() {
+                            module.set_browser_control(browser_control.clone());
+                        } else {
+                            error!(
+                                "browser_control module does not exist for module type: {:?}",
+                                embed_module
+                            );
+                        }
+                        if let Some(audio) = audio_module.as_ref() {
+                            module.set_audio_module(audio.clone());
+                        } else {
+                            error!(
+                                "audio module does not exist for module type: {:?}",
+                                embed_module
+                            );
+                        }
+                        if let Some(model) = model_module.as_ref() {
+                            module.set_model_module(model.clone());
+                        } else {
+                            error!(
+                                "model module does not exist for module type: {:?}",
+                                embed_module
+                            );
+                        }
+                        modules.insert(
+                            ModuleType::Embed(embed_module),
+                            Arc::new(RwLock::new(module)),
+                        );
+                    }
+                },
                 ModuleType::Wasm(path) => {
                     error!("wasm module not support yet: {}", path);
                 }
             }
         }
-        Ok(Self { modules })
+        Ok(Self { modules, conn })
     }
 
     /// 查询所有模块的功能列表

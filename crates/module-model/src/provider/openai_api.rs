@@ -17,7 +17,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct OpenAiApiConfig {
     pub base_url: String,
     pub api_key: String,

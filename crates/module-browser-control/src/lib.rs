@@ -11,10 +11,13 @@ use std::collections::HashMap;
 use tracing::{error, info};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BrowserControlConfig {
+    /// Viewport width in pixels
     pub viewport_width: u32,
+    /// Viewport height in pixels
     pub viewport_height: u32,
+    /// Optional custom Chromium path
     pub chromium_path: Option<String>,
 }
 

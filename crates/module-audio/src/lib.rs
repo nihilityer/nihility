@@ -13,7 +13,7 @@ pub use vad::silero::SileroConfig;
 pub use vad_stream::{SpeechSegment, VadStreamHandler, VadStreamParam};
 
 /// 音频模块配置
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct AudioConfig {
     /// 默认采样率
     pub default_sample_rate: u32,

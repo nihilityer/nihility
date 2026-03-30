@@ -19,7 +19,7 @@ pub struct OnlineFbank {
 }
 
 /// 实时fbank特征提取初始化配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct OnlineFbankConfig {
     pub sample_rate: usize,
     pub frame_len_ms: usize,
@@ -31,7 +31,7 @@ pub struct OnlineFbankConfig {
 }
 
 /// 实时fbank特征提取加窗类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum WindowType {
     Hanning,
     Hamming,

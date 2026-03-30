@@ -26,8 +26,9 @@ pub struct AsrResult {
     pub timestamp: u64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct EdgeDeviceControlConfig {
+    /// mDNS service type for device discovery
     pub mdns_service_type: String,
 }
 

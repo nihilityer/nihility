@@ -33,6 +33,7 @@ thiserror = { workspace = true }
 sea-orm = { workspace = true }
 uuid = { workspace = true }
 
+nihility-config = { workspace = true }
 nihility-secret = { workspace = true }
 nihility-server-entity = { workspace = true }
 nihility-server-migration = { workspace = true }

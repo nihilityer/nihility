@@ -18,8 +18,6 @@ use tracing::{debug, error, info, warn};
 struct AudioChunk {
     /// 音频数据
     data: Vec<f32>,
-    /// 对应的 VAD chunk 索引
-    vad_chunk_index: usize,
 }
 
 /// 音频处理器
@@ -86,10 +84,7 @@ impl AudioHandler {
         };
 
         // 将音频数据添加到缓冲区
-        let chunk = AudioChunk {
-            data: samples,
-            vad_chunk_index: self.vad_chunk_counter,
-        };
+        let chunk = AudioChunk { data: samples };
         self.audio_buffer.push_back(chunk);
 
         // 保持缓冲区大小，防止内存泄漏

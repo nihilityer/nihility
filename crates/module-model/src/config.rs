@@ -3,7 +3,7 @@ use crate::provider::sense_voice::SenseVoiceConfig;
 use serde::{Deserialize, Serialize};
 
 /// 模型能力类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum ModelCapability {
     TextCompletion,
     ImageUnderstanding,
@@ -11,7 +11,7 @@ pub enum ModelCapability {
 }
 
 /// 负载均衡策略
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema, Default)]
 pub enum LoadBalanceType {
     #[default]
     WeightedRoundRobin,
@@ -19,7 +19,7 @@ pub enum LoadBalanceType {
 }
 
 /// 负载均衡配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct LoadBalanceConfig {
     pub strategy: LoadBalanceType,
     #[serde(default = "default_failure_decrease_ratio")]
@@ -61,7 +61,7 @@ impl Default for LoadBalanceConfig {
 }
 
 /// 单个模型配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ModelEntry {
     pub name: String,
     pub provider: ProviderType,
@@ -70,14 +70,14 @@ pub struct ModelEntry {
     pub capabilities: Vec<ModelCapability>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum ProviderType {
     OpenAI(OpenAiApiConfig),
     Embed(EmbedProvider),
 }
 
 /// 嵌入提供者配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum EmbedProvider {
     SenseVoice(SenseVoiceConfig),
 }
@@ -87,7 +87,7 @@ fn default_weight() -> u32 {
 }
 
 /// 主配置结构 - 全局模型池
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema, Default)]
 pub struct ModelConfig {
     pub models: Vec<ModelEntry>,
     #[serde(default)]

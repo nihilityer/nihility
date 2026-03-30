@@ -7,10 +7,13 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
 /// Silero语音活动检测模型配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SileroConfig {
+    /// 采样率
     pub sample_rate: usize,
+    /// 块大小
     pub chunk_size: usize,
+    /// 模型路径
     pub model_path: String,
 }
 

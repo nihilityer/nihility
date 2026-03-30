@@ -1,4 +1,6 @@
 pub use crate::error::ConfigError;
+use schemars::JsonSchema;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fs;
@@ -6,6 +8,7 @@ use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::Path;
 use tracing::debug;
+use uuid::Uuid;
 
 mod error;
 
@@ -69,6 +72,78 @@ where
         config_file.flush()?;
     }
 
+    Ok(())
+}
+
+#[cfg(feature = "db")]
+pub async fn get_config_with_db<T>(
+    module_name: &str,
+    conn: &DatabaseConnection,
+) -> Result<T, ConfigError>
+where
+    T: Serialize + DeserializeOwned + Default + JsonSchema,
+{
+    if let Ok(config) = get_config::<T>(module_name) {
+        return Ok(config);
+    }
+    let entity_result = nihility_server_entity::module_config::Entity::find()
+        .filter(nihility_server_entity::module_config::Column::ModuleName.eq(module_name))
+        .one(conn)
+        .await?;
+    if let Some(record) = entity_result {
+        let config: T = serde_json::from_value(record.config_value)
+            .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+        debug!("Loaded config from database for module: {}", module_name);
+        return Ok(config);
+    }
+    let default_config = T::default();
+    set_config_with_db(module_name, &default_config, conn).await?;
+    debug!(
+        "Created default config in database for module: {}",
+        module_name
+    );
+    Ok(default_config)
+}
+
+#[cfg(feature = "db")]
+pub async fn set_config_with_db<T>(
+    module_name: &str,
+    config: &T,
+    conn: &DatabaseConnection,
+) -> Result<(), ConfigError>
+where
+    T: Serialize + JsonSchema,
+{
+    let json_value =
+        serde_json::to_value(config).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+    let json_schema = serde_json::to_value(&schemars::schema_for!(T))
+        .map_err(|e| ConfigError::SchemaGen(e.to_string()))?;
+    let now = chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap());
+    let existing = nihility_server_entity::module_config::Entity::find()
+        .filter(nihility_server_entity::module_config::Column::ModuleName.eq(module_name))
+        .one(conn)
+        .await?;
+    if let Some(record) = existing {
+        // Update existing
+        let mut active_model: nihility_server_entity::module_config::ActiveModel = record.into();
+        active_model.config_value = Set(json_value);
+        active_model.json_schema = Set(json_schema);
+        active_model.updated_at = Set(now);
+        active_model.update(conn).await?;
+    } else {
+        // Insert new
+        let active_model = nihility_server_entity::module_config::ActiveModel {
+            id: Set(Uuid::new_v4()),
+            module_name: Set(module_name.to_string()),
+            config_value: Set(json_value),
+            json_schema: Set(json_schema),
+            created_at: Set(now),
+            updated_at: Set(now),
+        };
+        active_model.insert(conn).await?;
+    }
+
+    debug!("Saved config to database for module: {}", module_name);
     Ok(())
 }
 

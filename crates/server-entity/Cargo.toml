@@ -11,5 +11,4 @@ homepage.workspace = true
 publish.workspace = true
 
 [dependencies]
-serde = { workspace = true }
 sea-orm = { workspace = true }

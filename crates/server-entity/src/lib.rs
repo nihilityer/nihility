@@ -3,4 +3,5 @@
 pub mod prelude;
 
 pub mod html_pages;
+pub mod module_config;
 pub mod user;
