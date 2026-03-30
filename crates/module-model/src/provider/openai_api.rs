@@ -17,10 +17,14 @@ use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+/// OpenAI API 提供者配置
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct OpenAiApiConfig {
+    /// API 服务基础 URL
     pub base_url: String,
+    /// API 密钥
     pub api_key: String,
+    /// 模型名称
     pub model: String,
 }
 

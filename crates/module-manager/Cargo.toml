@@ -27,7 +27,3 @@ anyhow = { workspace = true }
 
 tokio = { workspace = true }
 sea-orm = { workspace = true }
-
-[dev-dependencies]
-nihility-log = { workspace = true }
-image = { workspace = true }

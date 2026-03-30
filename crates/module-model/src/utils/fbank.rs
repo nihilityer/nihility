@@ -18,22 +18,34 @@ pub struct OnlineFbank {
     window_type: WindowType,
 }
 
-/// 实时fbank特征提取初始化配置
+/// 在线 Fbank 特征提取器配置
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct OnlineFbankConfig {
+    /// 音频采样率，单位：Hz
     pub sample_rate: usize,
+    /// 帧长度，单位：毫秒
+    /// 表示每个音频帧的持续时间
     pub frame_len_ms: usize,
+    /// 帧移（Hop Length），单位：毫秒
+    /// 相邻帧之间的时间间隔
     pub frame_shift_ms: usize,
+    /// Mel 滤波器数量
+    /// 决定 Mel 频谱图的频率分辨率
     pub num_mel_bins: usize,
+    /// Mel 滤波器最低频率，单位：Hz
     pub low_freq: f64,
+    /// Mel 滤波器最高频率，单位：Hz
     pub high_freq: f64,
+    /// 窗函数类型
     pub window_type: WindowType,
 }
 
-/// 实时fbank特征提取加窗类型
+/// 窗函数类型枚举
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum WindowType {
+    /// 汉宁窗（Hanning Window）
     Hanning,
+    /// 汉明窗（Hamming Window）
     Hamming,
 }
 

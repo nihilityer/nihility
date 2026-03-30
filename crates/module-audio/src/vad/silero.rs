@@ -6,14 +6,16 @@ use ort::value::Tensor;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-/// Silero语音活动检测模型配置
+/// Silero 语音活动检测模型配置
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SileroConfig {
-    /// 采样率
+    /// 音频采样率，单位：Hz
+    /// 支持 8000 Hz 和 16000 Hz
     pub sample_rate: usize,
-    /// 块大小
+    /// 音频块大小（样本数）
+    /// 根据采样率自动设置：8000Hz 时为 256，16000Hz 时为 512
     pub chunk_size: usize,
-    /// 模型路径
+    /// Silero VAD ONNX 模型文件路径
     pub model_path: String,
 }
 

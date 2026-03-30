@@ -14,26 +14,29 @@ use tokenizers::Tokenizer;
 use tokio::sync::Mutex;
 use tracing::debug;
 
-/// SenseVoice模型初始化配置
+/// SenseVoice 语音识别模型配置
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SenseVoiceConfig {
-    /// onnx模型路径
+    /// SenseVoice ONNX 模型文件路径
     pub model_path: String,
-    /// tokenizer文件路径
+    /// Tokenizer 文件路径
     pub tokenizer_path: String,
-    /// 每个输出帧包含的输入帧数（上下文窗口大小）
+    /// 每个输出帧包含的输入帧数（Low Frame Rate 上下文窗口大小）
+    /// 影响识别结果的时序分辨率
     pub lfr_m: usize,
     /// 帧率降低的倍数（跳跃步长）
+    /// 最终输出帧率 = 输入帧率 / (lfr_m * lfr_n)
     pub lfr_n: usize,
-    /// 倒谱均值方差归一化数据地址
+    /// 倒谱均值方差归一化（Cepstral Mean and Variance Normalization）数据文件路径
+    /// 用于对特征进行归一化处理
     pub cmvn_path: String,
-    /// 识别目标语言
+    /// 语音识别目标语言
     pub language: SenseVoiceLanguage,
-    /// 规范化文本方式
+    /// 文本规范化方式
     pub text_norm: SenseVoiceTextNorm,
-    /// 是否移除识别结果中表示状态的前四个token
+    /// 是否移除识别结果中表示状态的前四个 token
     pub remove_status_token: bool,
-    /// fbank特征提取相关配置
+    /// Fbank 特征提取器配置
     pub online_fbank_config: OnlineFbankConfig,
 }
 
@@ -57,20 +60,33 @@ pub struct SenseVoice {
     tokenizer: Tokenizer,
 }
 
+/// SenseVoice 语音识别目标语言枚举
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum SenseVoiceLanguage {
+    /// 自动检测语言
     Auto = 0,
+    /// 中文
     Zh = 3,
+    /// 英文
     En = 4,
+    /// 粤语
     Yue = 7,
+    /// 日语
     Ja = 11,
+    /// 韩语
     Ko = 12,
+    /// 无语音（纯静音检测）
     NoSpeech = 13,
 }
 
+/// SenseVoice 文本规范化方式枚举
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum SenseVoiceTextNorm {
+    /// 带逆向文本规范化（ITN），将数字、日期等转换为可读文本
+    /// 例如：123 → 一百二十三
     WithItn = 14,
+    /// 不带逆向文本规范化
+    /// 例如：123 → 123
     WoItn = 15,
 }
 
@@ -79,15 +95,24 @@ impl SenseVoice {
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| {
-                crate::error::ModelError::Provider(format!("Sense Voice Ort Session build fail: {}", e))
+                crate::error::ModelError::Provider(format!(
+                    "Sense Voice Ort Session build fail: {}",
+                    e
+                ))
             })?
             .with_inter_threads(1)
             .map_err(|e| {
-                crate::error::ModelError::Provider(format!("Sense Voice Ort Session build fail: {}", e))
+                crate::error::ModelError::Provider(format!(
+                    "Sense Voice Ort Session build fail: {}",
+                    e
+                ))
             })?
             .with_intra_threads(1)
             .map_err(|e| {
-                crate::error::ModelError::Provider(format!("Sense Voice Ort Session build fail: {}", e))
+                crate::error::ModelError::Provider(format!(
+                    "Sense Voice Ort Session build fail: {}",
+                    e
+                ))
             })?
             .commit_from_file(&config.model_path)?;
 
@@ -172,7 +197,9 @@ impl SenseVoice {
             let status_token = self
                 .tokenizer
                 .decode(&status_token_ids, true)
-                .map_err(|e| crate::error::ModelError::Provider(format!("tokenizer error: {}", e)))?;
+                .map_err(|e| {
+                    crate::error::ModelError::Provider(format!("tokenizer error: {}", e))
+                })?;
             debug!("SenseVoice infer status result: {:?}", status_token);
         }
 
@@ -221,10 +248,7 @@ impl ModelProvider for SenseVoice {
         audio_module: &Arc<nihility_module_audio::AudioModule>,
     ) -> Result<String> {
         // 验证采样率（固定 16000）
-        debug_assert_eq!(
-            sample_rate, 16000,
-            "Audio sample rate must be 16000 Hz"
-        );
+        debug_assert_eq!(sample_rate, 16000, "Audio sample rate must be 16000 Hz");
 
         // Step 1: 声道合并 (stereo -> mono)
         let waveform = if channels > 1 {

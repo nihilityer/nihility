@@ -26,9 +26,12 @@ pub struct AsrResult {
     pub timestamp: u64,
 }
 
+/// 边缘设备控制模块配置
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct EdgeDeviceControlConfig {
-    /// mDNS service type for device discovery
+    /// mDNS 服务类型，用于设备发现
+    /// 格式为 "_service._protocol.local."
+    /// 例如："_edge-device._tcp.local."
     pub mdns_service_type: String,
 }
 

@@ -11,13 +11,15 @@ use std::collections::HashMap;
 use tracing::{error, info};
 use uuid::Uuid;
 
+/// 浏览器控制模块配置
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BrowserControlConfig {
-    /// Viewport width in pixels
+    /// 视口宽度，单位：像素
     pub viewport_width: u32,
-    /// Viewport height in pixels
+    /// 视口高度，单位：像素
     pub viewport_height: u32,
-    /// Optional custom Chromium path
+    /// 可选的 Chromium 自定义路径
+    /// 如果为 None，则使用系统默认的 Chromium
     pub chromium_path: Option<String>,
 }
 
