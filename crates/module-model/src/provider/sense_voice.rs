@@ -245,22 +245,9 @@ impl ModelProvider for SenseVoice {
         audio_data: &[f32],
         sample_rate: u32,
         channels: u8,
-        audio_module: &Arc<nihility_module_audio::AudioModule>,
     ) -> Result<String> {
-        // 验证采样率（固定 16000）
         debug_assert_eq!(sample_rate, 16000, "Audio sample rate must be 16000 Hz");
-
-        // Step 1: 声道合并 (stereo -> mono)
-        let waveform = if channels > 1 {
-            audio_module.merge_channels(crate::MergeChannelsParam {
-                waveform: audio_data.to_vec(),
-                channels,
-            })?
-        } else {
-            audio_data.to_vec()
-        };
-
-        // Step 2: 推理
-        self.infer(waveform).await
+        debug_assert_eq!(channels, 1, "Audio channels must be 1");
+        self.infer(audio_data.to_vec()).await
     }
 }

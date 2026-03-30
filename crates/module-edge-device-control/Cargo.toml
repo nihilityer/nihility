@@ -14,7 +14,6 @@ publish.workspace = true
 nihility-config = { workspace = true }
 nihility-edge-protocol = { workspace = true }
 nihility-module = { workspace = true }
-nihility-module-audio = { workspace = true }
 nihility-module-browser-control = { workspace = true }
 nihility-module-model = { workspace = true }
 
@@ -32,6 +31,3 @@ mdns-sd = { workspace = true }
 tokio-tungstenite = { workspace = true }
 image = { workspace = true }
 rkyv = { workspace = true }
-
-[dev-dependencies]
-nihility-log = { workspace = true }

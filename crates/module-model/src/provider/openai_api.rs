@@ -186,7 +186,6 @@ impl ModelProvider for OpenAiApiProvider {
         audio_data: &[f32],
         sample_rate: u32,
         channels: u8,
-        _audio_module: &Arc<nihility_module_audio::AudioModule>,
     ) -> Result<String> {
         // OpenAI expects 16-bit PCM WAV, so convert f32 to 16-bit PCM and create WAV
         let spec = WavSpec {

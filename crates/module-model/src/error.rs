@@ -15,9 +15,6 @@ pub enum ModelError {
     ApiRequest(#[from] async_openai::error::OpenAIError),
 
     #[error(transparent)]
-    Audio(#[from] nihility_module_audio::error::AudioError),
-
-    #[error(transparent)]
     Wav(#[from] hound::Error),
 
     #[error("Provider error: {0}")]

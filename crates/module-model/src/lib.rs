@@ -11,12 +11,9 @@ use pool::ModelPool;
 use std::sync::Arc;
 use tracing::info;
 
-pub use nihility_module_audio::{MergeChannelsParam, PcmToWavParam};
-
 /// 模型模块主结构
 pub struct ModelModule {
     pool: Arc<ModelPool>,
-    audio_module: Option<Arc<nihility_module_audio::AudioModule>>,
 }
 
 impl ModelModule {
@@ -37,12 +34,6 @@ impl ModelModule {
         );
         Ok(Self {
             pool: Arc::new(pool),
-            audio_module: None,
         })
-    }
-
-    /// 设置音频模块引用
-    pub fn set_audio_module(&mut self, audio_module: Arc<nihility_module_audio::AudioModule>) {
-        self.audio_module = Some(audio_module);
     }
 }

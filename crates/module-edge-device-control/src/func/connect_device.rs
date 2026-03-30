@@ -24,9 +24,9 @@ impl EdgeDeviceControl {
                 "browser_control is required".to_string(),
             ));
         }
-        if self.audio_module.is_none() || self.model_module.is_none() {
+        if self.model_module.is_none() {
             return Err(EdgeDeviceControlError::ModuleStatus(
-                "audio_module and model_module are required".to_string(),
+                "model_module are required".to_string(),
             ));
         }
 
@@ -57,7 +57,6 @@ impl EdgeDeviceControl {
             .connect(
                 self.devices.clone(),
                 self.browser_control.as_ref().unwrap().clone(),
-                self.audio_module.as_ref().unwrap().clone(),
                 self.model_module.as_ref().unwrap().clone(),
                 Arc::new(asr_result_tx),
                 &page_id,

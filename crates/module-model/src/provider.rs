@@ -3,7 +3,6 @@ use crate::error::{ModelError, Result};
 use async_trait::async_trait;
 use futures::Stream;
 use std::pin::Pin;
-use std::sync::Arc;
 use tracing::debug;
 
 pub(crate) mod openai_api;
@@ -62,7 +61,6 @@ pub trait ModelProvider: Send + Sync {
         audio_data: &[f32],
         sample_rate: u32,
         channels: u8,
-        _audio_module: &Arc<nihility_module_audio::AudioModule>,
     ) -> Result<String> {
         debug!(
             "speech_recognition: sample_rate: {}, channels: {}, data_len: {}",

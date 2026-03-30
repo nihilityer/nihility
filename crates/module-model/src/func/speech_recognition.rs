@@ -20,21 +20,12 @@ impl ModelModule {
         &self,
         param: SpeechRecognitionParam,
     ) -> crate::error::Result<String> {
-        let audio_module = self.audio_module.clone().ok_or_else(|| {
-            crate::error::ModelError::Provider("audio_module not set".to_string())
-        })?;
         self.pool
             .invoke(ModelCapability::SpeechRecognition, |provider| {
                 let audio_data = param.audio_data.clone();
-                let audio_module = audio_module.clone();
                 async move {
                     provider
-                        .speech_recognition(
-                            &audio_data,
-                            param.sample_rate,
-                            param.channels,
-                            &audio_module,
-                        )
+                        .speech_recognition(&audio_data, param.sample_rate, param.channels)
                         .await
                 }
             })

@@ -21,7 +21,6 @@ pub enum EmbedModule {
     BrowserControl,
     EdgeDeviceControl,
     Model,
-    Audio,
 }
 
 /// 模块功能列表
@@ -42,7 +41,6 @@ pub struct ModuleManagerConfig {
 
 pub struct ModuleManager {
     modules: HashMap<ModuleType, Arc<RwLock<dyn Module + Send + Sync>>>,
-    conn: DatabaseConnection,
 }
 
 impl ModuleManager {
@@ -60,7 +58,6 @@ impl ModuleManager {
             HashMap::new();
 
         let mut browser_control = None;
-        let mut audio_module = None;
         let mut model_module = None;
 
         for enable_module in config.enable_modules {
@@ -78,29 +75,16 @@ impl ModuleManager {
                         browser_control = Some(module.clone());
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
-                    EmbedModule::Audio => {
-                        let config = nihility_config::get_config_with_db::<
-                            nihility_module_audio::AudioConfig,
-                        >("nihility-module-audio", &conn)
-                        .await?;
-                        let module = nihility_module_audio::AudioModule::init(config).await?;
-                        audio_module = Some(Arc::new(module));
-                    }
                     EmbedModule::Model => {
                         let config = nihility_config::get_config_with_db::<
                             nihility_module_model::ModelConfig,
                         >("nihility-module-model", &conn)
                         .await?;
-                        let mut module = nihility_module_model::ModelModule::init(config).await?;
-                        if let Some(audio) = audio_module.as_ref() {
-                            module.set_audio_module(audio.clone());
-                        } else {
-                            error!(
-                                "audio module does not exist for module type: {:?}",
-                                embed_module
-                            );
-                        }
-                        model_module = Some(Arc::new(RwLock::new(module)));
+                        let module = Arc::new(RwLock::new(
+                            nihility_module_model::ModelModule::init(config).await?,
+                        ));
+                        model_module = Some(module.clone());
+                        modules.insert(ModuleType::Embed(embed_module), module);
                     }
                     EmbedModule::EdgeDeviceControl => {
                         let config = nihility_config::get_config_with_db::<
@@ -117,14 +101,6 @@ impl ModuleManager {
                         } else {
                             error!(
                                 "browser_control module does not exist for module type: {:?}",
-                                embed_module
-                            );
-                        }
-                        if let Some(audio) = audio_module.as_ref() {
-                            module.set_audio_module(audio.clone());
-                        } else {
-                            error!(
-                                "audio module does not exist for module type: {:?}",
                                 embed_module
                             );
                         }
@@ -147,7 +123,7 @@ impl ModuleManager {
                 }
             }
         }
-        Ok(Self { modules, conn })
+        Ok(Self { modules })
     }
 
     /// 查询所有模块的功能列表
@@ -255,6 +231,7 @@ impl Default for ModuleManagerConfig {
             enable_modules: vec![
                 ModuleType::Embed(EmbedModule::BrowserControl),
                 ModuleType::Embed(EmbedModule::EdgeDeviceControl),
+                ModuleType::Embed(EmbedModule::Model),
             ],
         }
     }
@@ -274,7 +251,6 @@ impl ModuleManagerConfig {
 
         embeds.sort_by_key(|embed| match embed {
             EmbedModule::BrowserControl => 0,
-            EmbedModule::Audio => 1,
             EmbedModule::Model => 2,
             EmbedModule::EdgeDeviceControl => 3,
         });
@@ -296,7 +272,6 @@ impl Serialize for EmbedModule {
             EmbedModule::BrowserControl => "browser-control",
             EmbedModule::EdgeDeviceControl => "edge-device-control",
             EmbedModule::Model => "model",
-            EmbedModule::Audio => "audio",
         };
         serializer.serialize_str(s)
     }
@@ -312,7 +287,6 @@ impl<'de> Deserialize<'de> for EmbedModule {
             "browser-control" => Ok(EmbedModule::BrowserControl),
             "edge-device-control" => Ok(EmbedModule::EdgeDeviceControl),
             "model" => Ok(EmbedModule::Model),
-            "audio" => Ok(EmbedModule::Audio),
             _ => Err(serde::de::Error::custom(format!(
                 "unknown embed module: {}",
                 s
@@ -332,7 +306,6 @@ impl Serialize for ModuleType {
                     EmbedModule::BrowserControl => "browser-control",
                     EmbedModule::EdgeDeviceControl => "edge-device-control",
                     EmbedModule::Model => "model",
-                    EmbedModule::Audio => "audio",
                 };
                 format!("embed-{}", embed_str)
             }
@@ -354,7 +327,6 @@ impl<'de> Deserialize<'de> for ModuleType {
                 "browser-control" => Ok(ModuleType::Embed(EmbedModule::BrowserControl)),
                 "edge-device-control" => Ok(ModuleType::Embed(EmbedModule::EdgeDeviceControl)),
                 "model" => Ok(ModuleType::Embed(EmbedModule::Model)),
-                "audio" => Ok(ModuleType::Embed(EmbedModule::Audio)),
                 _ => Err(serde::de::Error::custom(format!(
                     "unknown embed module: {}",
                     embed_name

@@ -13,7 +13,6 @@ publish.workspace = true
 [dependencies]
 nihility-config = { workspace = true }
 nihility-module = { workspace = true }
-nihility-module-audio = { workspace = true }
 
 async-openai = { workspace = true }
 tokio = { workspace = true }

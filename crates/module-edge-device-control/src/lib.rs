@@ -7,7 +7,6 @@ use crate::error::*;
 
 use crate::device::Device;
 use crate::utils::discovery::start_discovery;
-use nihility_module_audio::AudioModule;
 use nihility_module_browser_control::BrowserControl;
 use nihility_module_model::ModelModule;
 use serde::{Deserialize, Serialize};
@@ -38,7 +37,6 @@ pub struct EdgeDeviceControlConfig {
 pub struct EdgeDeviceControl {
     devices: Arc<RwLock<HashMap<String, Device>>>,
     browser_control: Option<Arc<RwLock<BrowserControl>>>,
-    audio_module: Option<Arc<AudioModule>>,
     model_module: Option<Arc<RwLock<ModelModule>>>,
     asr_result_tx: broadcast::Sender<AsrResult>,
 }
@@ -77,7 +75,6 @@ impl EdgeDeviceControl {
         Ok(EdgeDeviceControl {
             devices,
             browser_control: None,
-            audio_module: None,
             model_module: None,
             asr_result_tx,
         })
@@ -86,11 +83,6 @@ impl EdgeDeviceControl {
     /// 设置浏览器控制引用
     pub fn set_browser_control(&mut self, browser: Arc<RwLock<BrowserControl>>) {
         self.browser_control = Some(browser);
-    }
-
-    /// 设置音频模块引用
-    pub fn set_audio_module(&mut self, audio: Arc<AudioModule>) {
-        self.audio_module = Some(audio);
     }
 
     /// 设置模型模块引用
