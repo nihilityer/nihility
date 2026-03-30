@@ -66,4 +66,3 @@ __screenshots__/
 package-lock.json
 db.sqlite
 .env
-model
