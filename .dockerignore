@@ -1,0 +1,7 @@
+target/
+.git/
+clients/
+frontend/node_modules/
+frontend/dist/
+config/
+*.log
