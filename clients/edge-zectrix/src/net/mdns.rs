@@ -71,7 +71,10 @@ async fn run_mdns(stack: Stack<'_>) -> Result<()> {
             ("screen_refresh_interval", "100"),
             ("screen_rotation", "0"),
             ("screen_mirror_h", "false"),
+            #[cfg(feature = "ssd2683")]
             ("screen_mirror_v", "false"),
+            #[cfg(feature = "ssd1683")]
+            ("screen_mirror_v", "true"),
         ],
     };
 

@@ -260,22 +260,14 @@ impl Display {
 
 impl EpdDisplay for Display {
     fn init(&mut self) -> Result<()> {
-        if self.update_count > 0 && self.update_count <= MAX_FAST_UPDATES {
-            self.use_fast_mode = !self.use_fast_mode;
-            self.fast_init(!self.use_fast_mode)
-        } else {
-            self.use_fast_mode = false;
-            self.normal_init()
-        }
+        Ok(())
     }
 
     fn full_update(&mut self, data: &[u8]) -> Result<()> {
-        self.init()?;
+        self.normal_init()?;
         self.write_all(data)?;
         self.normal_update()?;
-        self.deep_sleep(DeepSleepMode::DiscardRAM)?;
-        self.update_count += 1;
-        self.use_fast_mode = true;
+        self.deep_sleep(DeepSleepMode::PreserveRAM)?;
         Ok(())
     }
 
@@ -288,8 +280,10 @@ impl EpdDisplay for Display {
         data: &[u8],
         _prev_data: &[u8],
     ) -> Result<()> {
-        self.part_write(x, y, w, h, data)?;
+        let region_y = self.height - y - h;
+        self.part_write(x, region_y, w, h, data)?;
         self.part_update()?;
+        self.deep_sleep(DeepSleepMode::PreserveRAM)?;
         Ok(())
     }
 }
