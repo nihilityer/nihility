@@ -62,6 +62,7 @@
                     ref="formRef"
                     :schema="selectedConfig.json_schema"
                     :function-name="'config_value'"
+                    :value="selectedConfig.config_value"
                 />
               </div>
             </el-tab-pane>

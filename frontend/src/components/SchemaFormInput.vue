@@ -14,9 +14,12 @@ import VueForm from '@lljj/vue3-form-element'
 interface Props {
   schema: any
   functionName: string
+  value?: Record<string, any>
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  value: () => ({})
+})
 
 const formData = ref<any>({})
 
@@ -41,15 +44,22 @@ const normalizedSchema = computed(() => {
   return schema
 })
 
-// 初始化默认值
+// 初始化默认值，优先使用外部传入的值
 watch(
   () => props.schema,
   (newSchema) => {
     if (newSchema && newSchema.properties) {
       const defaults: any = {}
+
+      // 优先使用外部传入的值
+      if (props.value && Object.keys(props.value).length > 0) {
+        Object.assign(defaults, props.value)
+      }
+
+      // 再用 schema.default 补充未提供的字段
       Object.keys(newSchema.properties).forEach((key) => {
         const prop = newSchema.properties[key]
-        if (prop.default !== undefined) {
+        if (prop.default !== undefined && defaults[key] === undefined) {
           defaults[key] = prop.default
         }
       })
@@ -57,6 +67,17 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// 监听外部值变化
+watch(
+  () => props.value,
+  (newValue) => {
+    if (newValue && Object.keys(newValue).length > 0) {
+      formData.value = { ...newValue }
+    }
+  },
+  { deep: true }
 )
 
 // 暴露方法给父组件
