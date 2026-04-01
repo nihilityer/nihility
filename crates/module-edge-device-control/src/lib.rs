@@ -7,12 +7,12 @@ use crate::error::*;
 
 use crate::device::Device;
 use crate::utils::discovery::start_discovery;
+use axum::extract::ws::WebSocket;
 use nihility_module_browser_control::BrowserControl;
-use nihility_module_model::ModelModule;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{mpsc, RwLock};
 
 /// 语音识别结果
 #[derive(Debug, Clone)]
@@ -35,6 +35,7 @@ pub struct EdgeDeviceControlConfig {
 }
 
 pub struct EdgeDeviceControl {
+    web_socket_sender: mpsc::UnboundedSender<WebSocket>,
     devices: Arc<RwLock<HashMap<String, Device>>>,
     browser_control: Option<Arc<RwLock<BrowserControl>>>,
 }
@@ -50,6 +51,7 @@ impl EdgeDeviceControl {
     pub async fn init(config: EdgeDeviceControlConfig) -> Result<Self> {
         let devices = Arc::new(RwLock::new(HashMap::new()));
 
+        let (web_socket_sender, _web_socket_receiver) = mpsc::unbounded_channel();
         // 启动 mDNS 发现
         let (tx, mut rx) = mpsc::unbounded_channel();
         start_discovery(&config.mdns_service_type, tx)?;
@@ -68,6 +70,7 @@ impl EdgeDeviceControl {
         });
 
         Ok(EdgeDeviceControl {
+            web_socket_sender,
             devices,
             browser_control: None,
         })
@@ -76,6 +79,11 @@ impl EdgeDeviceControl {
     /// 设置浏览器控制引用
     pub fn set_browser_control(&mut self, browser: Arc<RwLock<BrowserControl>>) {
         self.browser_control = Some(browser);
+    }
+
+    /// 获取WebSocket的发送者，用于传递设备的WebSocket流到设备控制模块
+    pub fn get_web_socket_sender(&self) -> mpsc::UnboundedSender<WebSocket> {
+        self.web_socket_sender.clone()
     }
 }
 

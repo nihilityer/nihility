@@ -5,6 +5,7 @@ mod jwt;
 mod module_config;
 mod module_manager;
 mod test;
+mod ws;
 
 use crate::error::*;
 use crate::router::embed_assets::embed_assets_handler;
@@ -14,6 +15,7 @@ use crate::router::jwt::{auth_middleware, authorize};
 use crate::router::module_config::module_config_router;
 use crate::router::module_manager::module_manager_router;
 use crate::router::test::test;
+use crate::router::ws::ws_router;
 use crate::AppState;
 use axum::routing::{any, get, post};
 use axum::{middleware, Router};
@@ -35,6 +37,7 @@ pub(super) fn app_router(state: AppState) -> Router<AppState> {
                     auth_middleware,
                 )),
         )
+        .nest("/ws", ws_router())
         .route("/html/{path}", get(get_html_page))
         .fallback(get(embed_assets_handler))
 }

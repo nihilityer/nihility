@@ -40,7 +40,7 @@ nihility-server-entity = { path = "crates/server-entity" }
 nihility-server-migration = { path = "crates/server-migration" }
 
 http = { version = "1.4" }
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "ws"] }
 axum-extra = { version = "0.12", features = ["typed-header"] }
 rand = { version = "0.10" }
 argon2 = { version = "0.5" }

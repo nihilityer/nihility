@@ -2,6 +2,7 @@ pub mod error;
 
 use crate::error::*;
 use nihility_module::{BoxStream, FunctionMetadata, Module};
+use nihility_module_edge_device_control::EdgeDeviceControl;
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -41,6 +42,7 @@ pub struct ModuleManagerConfig {
 
 pub struct ModuleManager {
     modules: HashMap<ModuleType, Arc<RwLock<dyn Module + Send + Sync>>>,
+    edge_device_control: Option<Arc<RwLock<EdgeDeviceControl>>>,
 }
 
 impl ModuleManager {
@@ -58,7 +60,7 @@ impl ModuleManager {
             HashMap::new();
 
         let mut browser_control = None;
-        let mut model_module = None;
+        let mut edge_device_control = None;
 
         for enable_module in config.enable_modules {
             match enable_module {
@@ -83,7 +85,6 @@ impl ModuleManager {
                         let module = Arc::new(RwLock::new(
                             nihility_module_model::ModelModule::init(config).await?,
                         ));
-                        model_module = Some(module.clone());
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                     EmbedModule::EdgeDeviceControl => {
@@ -93,9 +94,7 @@ impl ModuleManager {
                             "nihility-module-edge-device-control", &conn
                         )
                         .await?;
-                        let mut module =
-                            nihility_module_edge_device_control::EdgeDeviceControl::init(config)
-                                .await?;
+                        let mut module = EdgeDeviceControl::init(config).await?;
                         if let Some(browser_control) = browser_control.as_ref() {
                             module.set_browser_control(browser_control.clone());
                         } else {
@@ -104,10 +103,9 @@ impl ModuleManager {
                                 embed_module
                             );
                         }
-                        modules.insert(
-                            ModuleType::Embed(embed_module),
-                            Arc::new(RwLock::new(module)),
-                        );
+                        let module = Arc::new(RwLock::new(module));
+                        edge_device_control = Some(module.clone());
+                        modules.insert(ModuleType::Embed(embed_module), module);
                     }
                 },
                 ModuleType::Wasm(path) => {
@@ -115,7 +113,21 @@ impl ModuleManager {
                 }
             }
         }
-        Ok(Self { modules })
+        Ok(Self {
+            modules,
+            edge_device_control,
+        })
+    }
+
+    pub fn get_edge_device_control(&self) -> Result<Arc<RwLock<EdgeDeviceControl>>> {
+        self.edge_device_control
+            .as_ref()
+            .map(Clone::clone)
+            .ok_or_else(|| {
+                ModuleManagerError::ModuleNotFound(ModuleType::Embed(
+                    EmbedModule::EdgeDeviceControl,
+                ))
+            })
     }
 
     /// 查询所有模块的功能列表

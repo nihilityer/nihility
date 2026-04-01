@@ -15,9 +15,9 @@ nihility-config = { workspace = true }
 nihility-edge-protocol = { workspace = true }
 nihility-module = { workspace = true }
 nihility-module-browser-control = { workspace = true }
-nihility-module-model = { workspace = true }
 
 uuid = { workspace = true }
+axum = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
