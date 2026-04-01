@@ -1,13 +1,14 @@
 use crate::device::screen_processor::{ScreenProcessor, ScreenUpdate};
-use crate::device::Device;
+use crate::device::{Device, DeviceInfo};
 use crate::error::*;
-use nihility_edge_protocol::{DeviceInfo, Message};
+use nihility_edge_protocol::Message;
 use nihility_module_browser_control::func::screenshot::ScreenshotParam;
 use nihility_module_browser_control::BrowserControl;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
 /// 新建一个线程处理设备屏幕刷新推送
@@ -17,6 +18,7 @@ pub(crate) async fn start_screen_refresh(
     browser_control: Arc<RwLock<BrowserControl>>,
     page_id: &str,
     screenshot_selector: Option<String>,
+    cancellation_token: CancellationToken,
 ) -> Result<JoinHandle<Result<()>>> {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(
         device_info.screen_refresh_interval as u64,
@@ -38,18 +40,37 @@ pub(crate) async fn start_screen_refresh(
     };
     let join_handle = tokio::spawn(async move {
         loop {
-            interval.tick().await;
-            {
-                let devices_guard = devices.read().await;
-                let device = devices_guard.get(&device_info.device_id).ok_or_else(|| {
-                    EdgeDeviceControlError::DeviceStatus(format!(
-                        "device {} not found",
-                        device_info.device_id
-                    ))
-                })?;
-                if !device.screen_refresh_task_switch {
-                    continue;
+            tokio::select! {
+                _ = interval.tick() => {
+                    // 正常 tick，继续处理
                 }
+                _ = cancellation_token.cancelled() => {
+                    info!("Screen refresh task for device {} cancelled", device_info.device_id);
+                    break;
+                }
+            }
+
+            // 检查设备是否还存在
+            let should_continue = {
+                let devices_guard = devices.read().await;
+                match devices_guard.get(&device_info.device_id) {
+                    Some(device) => device.screen_refresh_task_switch,
+                    None => {
+                        info!(
+                            "Device {} not found, stopping screen refresh",
+                            device_info.device_id
+                        );
+                        break;
+                    }
+                }
+            };
+
+            if !should_continue {
+                info!(
+                    "Screen refresh task for device {} stopping",
+                    device_info.device_id
+                );
+                break;
             }
 
             let png_data = browser_control
@@ -58,7 +79,7 @@ pub(crate) async fn start_screen_refresh(
                 .screenshot(screenshot_param.clone())
                 .await?;
 
-            // 3. 转换为 1-bit 位图
+            // 转换为 1-bit 位图
             let full_screen = match processor.convert_png_to_1bit(&png_data) {
                 Ok(screen) => screen,
                 Err(e) => {
@@ -67,8 +88,8 @@ pub(crate) async fn start_screen_refresh(
                 }
             };
 
-            // 4. 计算更新类型
-            // 5. 根据更新类型决定是否发送消息
+            // 计算更新类型
+            // 根据更新类型决定是否发送消息
             match processor.diff(full_screen) {
                 ScreenUpdate::Full(full_screen) => {
                     info!("Full screen update -> {}", device_info.device_id);
@@ -121,6 +142,8 @@ pub(crate) async fn start_screen_refresh(
                 ScreenUpdate::Skip => {}
             }
         }
+        cancellation_token.cancel();
+        Ok(())
     });
     Ok(join_handle)
 }

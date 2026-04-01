@@ -9,5 +9,5 @@ pub mod screen;
 
 pub use audio::AudioData;
 pub use key::{KeyCode, KeyEvent};
-pub use message::{DeviceInfo, Message};
-pub use screen::{FullScreenData, IncrementalScreenData, ScreenConfig, ScreenRotation, UpdateRegion};
+pub use message::Message;
+pub use screen::{FullScreenData, IncrementalScreenData, UpdateRegion};

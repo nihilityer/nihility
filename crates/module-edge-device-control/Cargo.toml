@@ -27,6 +27,7 @@ async-trait = { workspace = true }
 anyhow = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 mdns-sd = { workspace = true }
 tokio-tungstenite = { workspace = true }
 image = { workspace = true }

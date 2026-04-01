@@ -57,6 +57,7 @@ schemars = { version = "1.2", default-features = false, features = ["derive"] }
 toml = { version = "1.0", default-features = false, features = ["display", "parse", "serde"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 tokio = { version = "1.49", features = ["macros", "rt-multi-thread"] }
+tokio-util = { version = "0.7" }
 futures = { version = "0.3" }
 async-trait = { version = "0.1" }
 async-stream = { version = "0.3" }

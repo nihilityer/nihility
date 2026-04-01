@@ -1,6 +1,6 @@
+use crate::device::{DeviceInfo, ScreenConfig, ScreenRotation};
 use crate::error::*;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
-use nihility_edge_protocol::{DeviceInfo, ScreenConfig, ScreenRotation};
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
 use tracing::info;
