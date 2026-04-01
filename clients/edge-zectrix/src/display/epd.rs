@@ -57,6 +57,7 @@ impl EpdInterface {
         Ok(())
     }
 
+    #[cfg(feature = "ssd2683")]
     pub fn receive_data(&mut self) -> Result<u8> {
         let mut buf = [0];
         self.dc.set_high();
@@ -96,17 +97,5 @@ impl EpdInterface {
     #[cfg(feature = "ssd2683")]
     pub fn busy_wait(&self) {
         while self.busy.is_low() {}
-    }
-
-    /// 返回当前 busy 信号状态
-    pub fn is_busy(&self) -> bool {
-        #[cfg(feature = "ssd1683")]
-        {
-            self.busy.is_high()
-        }
-        #[cfg(feature = "ssd2683")]
-        {
-            self.busy.is_low()
-        }
     }
 }

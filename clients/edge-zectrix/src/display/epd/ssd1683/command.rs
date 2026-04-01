@@ -34,6 +34,7 @@ macro_rules! pack {
     }};
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum IncrementAxis {
     /// X 方向
@@ -42,6 +43,7 @@ pub enum IncrementAxis {
     Vertical,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum DataEntryMode {
     DecrementXDecrementY,
@@ -50,13 +52,7 @@ pub enum DataEntryMode {
     IncrementYIncrementX,
 }
 
-#[derive(Clone, Copy)]
-pub enum RamOption {
-    Normal = 0x00,
-    Bypass = 0x04,
-    Invert = 0x08,
-}
-
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum DeepSleepMode {
     /// 非睡眠模式
@@ -68,6 +64,7 @@ pub enum DeepSleepMode {
 }
 
 /// 可以发送到控制器的命令。
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum Command {
     /// 0x01: 设置栅极线的 MUX、扫描序列和方向

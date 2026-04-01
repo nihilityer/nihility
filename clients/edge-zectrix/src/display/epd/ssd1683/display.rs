@@ -4,16 +4,12 @@ use crate::display::epd_trait::EpdDisplay;
 use anyhow::Result;
 use esp_hal::delay::Delay;
 
-const MAX_FAST_UPDATES: usize = 10;
-
 /// 基于数据驱动的显示驱动
 pub struct Display {
     interface: EpdInterface,
     delay: Delay,
     width: usize,
     height: u16,
-    update_count: usize,
-    use_fast_mode: bool,
 }
 
 impl Display {
@@ -27,8 +23,6 @@ impl Display {
             delay,
             width,
             height,
-            update_count: 0,
-            use_fast_mode: false,
         }
     }
 
@@ -66,6 +60,7 @@ impl Display {
 
     /// 全局快速刷新初始化
     /// more_fast为true时，大约1.0s,反之1.5s
+    #[allow(dead_code)]
     pub(crate) fn fast_init(&mut self, more_fast: bool) -> Result<()> {
         // 硬件重置
         self.interface.reset(&self.delay)?;
@@ -119,6 +114,7 @@ impl Display {
     }
 
     /// 执行全局快速刷新
+    #[allow(dead_code)]
     pub(crate) fn fast_update(&mut self) -> Result<()> {
         Command::DisplayUpdateControl2(0xC7).execute(&mut self.interface)?;
         Command::MasterActivation.execute(&mut self.interface)?;
@@ -234,26 +230,6 @@ impl Display {
     pub(crate) fn deep_sleep(&mut self, mode: DeepSleepMode) -> Result<()> {
         Command::DeepSleepMode(mode).execute(&mut self.interface)?;
         self.delay.delay_millis(100);
-        Ok(())
-    }
-
-    /// 写入图像数据（双RAM版本）
-    ///
-    /// # 参数
-    /// - `bw`: 黑白数据
-    /// - `red`: 红色数据
-    pub(crate) fn write_all_with_red(&mut self, bw: &[u8], red: &[u8]) -> Result<()> {
-        let expected_len = (self.width * self.height as usize) / 8;
-        if bw.len() != expected_len || red.len() != expected_len {
-            panic!("Data length mismatch");
-        }
-
-        Command::WriteRamBW.execute(&mut self.interface)?;
-        self.interface.send_data(bw)?;
-
-        Command::WriteRamRed.execute(&mut self.interface)?;
-        self.interface.send_data(red)?;
-
         Ok(())
     }
 }

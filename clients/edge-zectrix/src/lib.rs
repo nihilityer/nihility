@@ -20,7 +20,6 @@ use embassy_executor::Spawner;
 use embassy_net::{Config, DhcpConfig, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::CpuClock;
-use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::wifi::{AccessPointConfig, ClientConfig};
@@ -43,6 +42,7 @@ pub async fn init(spawner: Spawner) -> Result<()> {
 
     #[cfg(feature = "ssd2683")]
     {
+        use esp_hal::gpio::{Level, Output, OutputConfig};
         let _pwr = Output::new(peripherals.GPIO17, Level::High, OutputConfig::default());
         let _epd_pwr = Output::new(peripherals.GPIO6, Level::High, OutputConfig::default());
     }

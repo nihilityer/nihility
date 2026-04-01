@@ -10,7 +10,7 @@ use critical_section::Mutex;
 use epd::Display;
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig};
-use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO13, GPIO6, GPIO8, GPIO9, SPI3};
+use esp_hal::peripherals::{GPIO10, GPIO11, GPIO12, GPIO13, GPIO8, GPIO9, SPI3};
 use esp_hal::spi::master::Spi;
 use esp_hal::spi::{BitOrder, Mode};
 use esp_hal::time::Rate;
