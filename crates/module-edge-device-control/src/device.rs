@@ -1,16 +1,13 @@
 use crate::device::connect_ws::connect_ws;
-use crate::device::task::message_handler::start_message_handler;
 use crate::device::task::screen_refresh::start_screen_refresh;
 use crate::error::*;
-use crate::AsrResult;
 use nihility_edge_protocol::Message;
 use nihility_module_browser_control::BrowserControl;
-use nihility_module_model::ModelModule;
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -90,8 +87,6 @@ impl Device {
         &mut self,
         devices: Arc<RwLock<HashMap<String, Device>>>,
         browser_control: Arc<RwLock<BrowserControl>>,
-        model_module: Arc<RwLock<ModelModule>>,
-        asr_result_tx: Arc<broadcast::Sender<AsrResult>>,
         page_id: &str,
         screenshot_selector: Option<String>,
     ) -> Result<()> {
@@ -107,8 +102,16 @@ impl Device {
         self.cancellation_token = cancellation_token.clone();
 
         if let Some(addr) = &self.addr {
-            let (tx, rx) = connect_ws(*addr, cancellation_token.clone()).await?;
-            self.ws_sender = Some(tx);
+            self.ws_sender = Some(
+                connect_ws(
+                    *addr,
+                    self.info.device_id.clone(),
+                    devices.clone(),
+                    browser_control.clone(),
+                    cancellation_token.clone(),
+                )
+                .await?,
+            );
 
             // 启动断开监听任务
             let device_id = self.info.device_id.clone();
@@ -126,19 +129,11 @@ impl Device {
                     );
                     device.status = DeviceStatus::Discovered;
                     device.ws_sender = None;
+                    if let Some(screen_refresh_task) = &device.screen_refresh_task {
+                        screen_refresh_task.abort();
+                    }
                 }
             });
-
-            start_message_handler(
-                self.info.device_id.clone(),
-                devices.clone(),
-                browser_control.clone(),
-                model_module,
-                asr_result_tx,
-                rx,
-                cancellation_token.clone(),
-            )
-            .await?;
         } else {
             // TODO 暂时只支持服务端主动连接设备
             return Err(EdgeDeviceControlError::DeviceStatus(format!(

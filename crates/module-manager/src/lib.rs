@@ -104,14 +104,6 @@ impl ModuleManager {
                                 embed_module
                             );
                         }
-                        if let Some(model) = model_module.as_ref() {
-                            module.set_model_module(model.clone());
-                        } else {
-                            error!(
-                                "model module does not exist for module type: {:?}",
-                                embed_module
-                            );
-                        }
                         modules.insert(
                             ModuleType::Embed(embed_module),
                             Arc::new(RwLock::new(module)),

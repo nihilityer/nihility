@@ -3,7 +3,6 @@ use crate::EdgeDeviceControl;
 use nihility_module_browser_control::func::open_page::OpenPageParam;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tracing::info;
 
 /// 连接新设备
@@ -22,11 +21,6 @@ impl EdgeDeviceControl {
         if self.browser_control.is_none() {
             return Err(EdgeDeviceControlError::ModuleStatus(
                 "browser_control is required".to_string(),
-            ));
-        }
-        if self.model_module.is_none() {
-            return Err(EdgeDeviceControlError::ModuleStatus(
-                "model_module are required".to_string(),
             ));
         }
 
@@ -50,15 +44,10 @@ impl EdgeDeviceControl {
             param.device_id, page_id
         );
 
-        // 创建独立的 ASR result broadcast sender 用于这个设备
-        let asr_result_tx = self.asr_result_tx.clone();
-
         device
             .connect(
                 self.devices.clone(),
                 self.browser_control.as_ref().unwrap().clone(),
-                self.model_module.as_ref().unwrap().clone(),
-                Arc::new(asr_result_tx),
                 &page_id,
                 param.screenshot_selector,
             )

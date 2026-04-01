@@ -37,8 +37,6 @@ pub struct EdgeDeviceControlConfig {
 pub struct EdgeDeviceControl {
     devices: Arc<RwLock<HashMap<String, Device>>>,
     browser_control: Option<Arc<RwLock<BrowserControl>>>,
-    model_module: Option<Arc<RwLock<ModelModule>>>,
-    asr_result_tx: broadcast::Sender<AsrResult>,
 }
 
 impl EdgeDeviceControl {
@@ -51,9 +49,6 @@ impl EdgeDeviceControl {
 
     pub async fn init(config: EdgeDeviceControlConfig) -> Result<Self> {
         let devices = Arc::new(RwLock::new(HashMap::new()));
-
-        // 创建 ASR 结果广播 channel
-        let (asr_result_tx, _) = broadcast::channel(32);
 
         // 启动 mDNS 发现
         let (tx, mut rx) = mpsc::unbounded_channel();
@@ -75,24 +70,12 @@ impl EdgeDeviceControl {
         Ok(EdgeDeviceControl {
             devices,
             browser_control: None,
-            model_module: None,
-            asr_result_tx,
         })
     }
 
     /// 设置浏览器控制引用
     pub fn set_browser_control(&mut self, browser: Arc<RwLock<BrowserControl>>) {
         self.browser_control = Some(browser);
-    }
-
-    /// 设置模型模块引用
-    pub fn set_model_module(&mut self, model: Arc<RwLock<ModelModule>>) {
-        self.model_module = Some(model);
-    }
-
-    /// 订阅 ASR 识别结果
-    pub fn subscribe_asr_results(&self) -> broadcast::Receiver<AsrResult> {
-        self.asr_result_tx.subscribe()
     }
 }
 
