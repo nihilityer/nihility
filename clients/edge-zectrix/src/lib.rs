@@ -5,6 +5,7 @@
 extern crate alloc;
 
 use crate::display::display_task;
+use crate::input::button_task;
 use crate::net::wifi::{dhcp_task, net_task, run_ap_mode, run_client_mode, AP_SSID, GW_IP};
 use crate::net::{get_device_id, MAX_RETRY_COUNT};
 use crate::storage::{clear_credentials, init_storage, load_config};
@@ -29,6 +30,7 @@ use nihility_edge_protocol::Message;
 use smoltcp::wire::Ipv4Cidr;
 
 mod display;
+mod input;
 mod net;
 mod storage;
 mod work;
@@ -61,6 +63,12 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         peripherals.SPI3,
         peripherals.GPIO12,
         peripherals.GPIO13,
+    ))?;
+
+    spawner.spawn(button_task(
+        peripherals.GPIO0,
+        peripherals.GPIO39,
+        peripherals.GPIO18,
     ))?;
 
     let config = load_config()?;
@@ -111,7 +119,7 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         }
 
         // 启动 WebSocket 客户端连接服务器
-        run_ws_client(sta_stack, cfg.server, rng).await?;
+        run_ws_client(sta_stack, cfg.server, &rng).await?;
     } else {
         // 没有凭证，启动AP模式
         info!("No saved WiFi credentials found, starting AP mode");

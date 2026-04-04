@@ -1,3 +1,4 @@
+use crate::input::KEY_CHANNEL;
 use crate::net::get_device_id;
 use crate::storage::ServerConfig;
 use crate::DISPLAY_CHANNEL;
@@ -8,12 +9,14 @@ use core::net::{IpAddr, SocketAddr};
 use core::str::FromStr;
 use edge_http::io::client::Connection;
 use edge_http::ws::{MAX_BASE64_KEY_LEN, MAX_BASE64_KEY_RESPONSE_LEN, NONCE_LEN};
-use edge_nal_embassy::{Tcp, TcpBuffers, TcpSocket};
+use edge_nal::TcpSplit;
+use edge_nal_embassy::{Tcp, TcpBuffers, TcpSocketRead, TcpSocketWrite};
 use edge_ws::{FrameHeader, FrameType};
+use embassy_futures::select::select;
 use embassy_net::Stack;
 use embassy_time::{Duration, Timer};
 use esp_hal::rng::Rng;
-use log::{error, info};
+use log::{error, info, warn};
 use nihility_edge_protocol::{DeviceInfo, Message, ScreenConfig, ScreenRotation};
 use postcard::{from_bytes, to_allocvec};
 
@@ -40,9 +43,9 @@ fn build_device_info() -> DeviceInfo {
 
 /// 发送消息（使用 rkyv 序列化）
 async fn send_message<'a>(
-    mut socket: &mut TcpSocket<'a>,
+    mut socket: &mut TcpSocketWrite<'a>,
     msg: &Message,
-    rng: &mut Rng,
+    rng: &Rng,
 ) -> Result<()> {
     let bytes = to_allocvec(msg).map_err(|e| anyhow::anyhow!("Serialize error: {:?}", e))?;
     info!("sending message: {:?}", bytes.as_slice());
@@ -57,7 +60,7 @@ async fn send_message<'a>(
 }
 
 /// 接收并反序列化消息
-async fn recv_message<'a>(mut socket: &mut TcpSocket<'a>, buf: &mut [u8]) -> Result<Message> {
+async fn recv_message<'a>(mut socket: &mut TcpSocketRead<'a>, buf: &mut [u8]) -> Result<Message> {
     let header = FrameHeader::recv(&mut socket).await?;
     let payload = header.recv_payload(&mut socket, buf).await?;
     match header.frame_type {
@@ -78,9 +81,9 @@ async fn recv_message<'a>(mut socket: &mut TcpSocket<'a>, buf: &mut [u8]) -> Res
 }
 
 /// 运行 WebSocket 客户端（带重连机制）
-pub async fn run_ws_client(stack: Stack<'static>, config: ServerConfig, rng: Rng) -> Result<()> {
+pub async fn run_ws_client(stack: Stack<'static>, config: ServerConfig, rng: &Rng) -> Result<()> {
     loop {
-        match run_ws_client_once(&stack, &config, &mut rng.clone()).await {
+        match run_ws_client_once(&stack, &config, &rng).await {
             Ok(()) => {
                 info!("Connection closed normally");
                 break;
@@ -101,7 +104,7 @@ pub async fn run_ws_client(stack: Stack<'static>, config: ServerConfig, rng: Rng
 async fn run_ws_client_once(
     stack: &Stack<'static>,
     config: &ServerConfig,
-    rng: &mut Rng,
+    rng: &Rng,
 ) -> Result<()> {
     let tcp_buf = Box::leak(Box::new_in(
         TcpBuffers::<3, 4096, 4096>::new(),
@@ -142,43 +145,40 @@ async fn run_ws_client_once(
     info!("Connection upgraded to WS, starting traffic now");
     Timer::after(Duration::from_secs(1)).await;
 
-    // 构建并发送设备信息
-    send_message(&mut socket, &Message::DeviceInfo(build_device_info()), rng).await?;
-    info!("DeviceInfo sent");
-    let display_sender = DISPLAY_CHANNEL.sender();
+    let (ws_tx, ws_rx) = socket.split();
 
+    select(send_ws(ws_rx, &rng), receive_ws(ws_tx, &mut msg_buf)).await;
+
+    Err(anyhow::anyhow!("Connection closed"))
+}
+
+async fn send_ws<'a>(mut ws_rx: TcpSocketWrite<'a>, rng: &Rng) -> Result<()> {
+    send_message(&mut ws_rx, &Message::DeviceInfo(build_device_info()), rng).await?;
+    info!("DeviceInfo sent");
+    let key_receiver = KEY_CHANNEL.receiver();
     loop {
-        // 使用超时接收消息
-        match recv_message(&mut socket, &mut msg_buf).await {
-            Ok(msg) => match msg {
-                Message::FullScreenUpdate(data) => {
-                    display_sender.send(Message::FullScreenUpdate(data)).await
-                }
-                Message::IncrementalScreenUpdate(data) => {
-                    display_sender
-                        .send(Message::IncrementalScreenUpdate(data))
-                        .await
-                }
-                _ => {
-                    info!("Received unexpected message type: {:?}", msg);
-                }
-            },
-            Err(e) => {
-                // 连接错误，退出循环触发重连
-                error!("Connection error: {:?}", e);
-                break;
+        let key_event = key_receiver.receive().await;
+        info!("Sending key event: {:?}", key_event);
+        send_message(&mut ws_rx, &Message::KeyEvent(key_event), rng).await?;
+    }
+}
+
+async fn receive_ws<'a>(mut ws_tx: TcpSocketRead<'a>, msg_buf: &mut [u8]) -> Result<()> {
+    let display_sender = DISPLAY_CHANNEL.sender();
+    while let Ok(msg) = recv_message(&mut ws_tx, msg_buf).await {
+        match msg {
+            Message::FullScreenUpdate(data) => {
+                display_sender.send(Message::FullScreenUpdate(data)).await
+            }
+            Message::IncrementalScreenUpdate(data) => {
+                display_sender
+                    .send(Message::IncrementalScreenUpdate(data))
+                    .await
+            }
+            _ => {
+                warn!("Received unexpected message type: {:?}", msg);
             }
         }
     }
-
-    // 发送关闭帧
-    let header = FrameHeader {
-        frame_type: FrameType::Close,
-        payload_len: 0,
-        mask_key: rng.random().into(),
-    };
-    info!("Closing connection");
-    header.send(&mut socket).await?;
-
     Ok(())
 }
