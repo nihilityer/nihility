@@ -5,12 +5,11 @@
 extern crate alloc;
 
 use crate::display::{init_and_clear_screen, init_display};
-use crate::net::mdns::start_mdns;
 use crate::net::wifi::{dhcp_task, net_task, run_ap_mode, run_client_mode, AP_SSID, GW_IP};
 use crate::net::{get_device_id, MAX_RETRY_COUNT};
-use crate::storage::{clear_credentials, init_storage, load_credentials};
+use crate::storage::{clear_credentials, init_storage, load_config};
 use crate::work::config_server::run_config_server;
-use crate::work::ws_server::run_ws_server;
+use crate::work::ws_client::run_ws_client;
 use alloc::boxed::Box;
 use alloc::format;
 use anyhow::Result;
@@ -61,7 +60,7 @@ pub async fn init(spawner: Spawner) -> Result<()> {
     // 初始化并清空屏幕（显示全白）
     init_and_clear_screen()?;
 
-    let credentials = load_credentials()?;
+    let config = load_config()?;
 
     let radio_init = Box::leak(Box::new(esp_radio::init()?));
     let (controller, interfaces) =
@@ -70,9 +69,12 @@ pub async fn init(spawner: Spawner) -> Result<()> {
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
-    if let Some(creds) = credentials {
-        // 有保存的凭证，启动STA模式
-        info!("Found saved WiFi credentials: SSID={}", creds.ssid);
+    if let Some(cfg) = config {
+        // 有保存的配置，启动STA模式
+        info!(
+            "Found saved config: SSID={}, Server={}:{}",
+            cfg.wifi.ssid, cfg.server.host, cfg.server.port
+        );
 
         let sta_net_config = Config::dhcpv4(DhcpConfig::default());
         let (sta_stack, sta_runner) = embassy_net::new(
@@ -88,8 +90,8 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         spawner.spawn(net_task(sta_runner))?;
 
         let client_config = ClientConfig::default()
-            .with_ssid(creds.ssid.clone())
-            .with_password(creds.password.clone());
+            .with_ssid(cfg.wifi.ssid.clone())
+            .with_password(cfg.wifi.password.clone());
 
         spawner.spawn(run_client_mode(controller, client_config))?;
 
@@ -105,9 +107,8 @@ pub async fn init(spawner: Spawner) -> Result<()> {
             Timer::after(Duration::from_secs(1)).await
         }
 
-        spawner.spawn(start_mdns(sta_stack.clone()))?;
-
-        run_ws_server(sta_stack).await?;
+        // 启动 WebSocket 客户端连接服务器
+        run_ws_client(sta_stack, cfg.server, rng).await?;
     } else {
         // 没有凭证，启动AP模式
         info!("No saved WiFi credentials found, starting AP mode");

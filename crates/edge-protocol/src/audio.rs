@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+use serde::{Deserialize, Serialize};
 
 /// 音频数据消息（设备 -> 服务器）
-#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioData {
     /// PCM 32bit 浮点音频数据 (IEEE 754)
     pub audio_data: Vec<f32>,

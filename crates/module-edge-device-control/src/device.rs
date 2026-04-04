@@ -1,71 +1,28 @@
-use crate::device::connect_ws::connect_ws;
+use crate::device::task::key_handle::start_key_handle;
 use crate::device::task::screen_refresh::start_screen_refresh;
 use crate::error::*;
-use nihility_edge_protocol::Message;
+use nihility_edge_protocol::{DeviceInfo, KeyCode, Message};
 use nihility_module_browser_control::BrowserControl;
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
+pub(crate) use task::message_handle::start_message_handle;
 use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use uuid::Uuid;
 
-pub mod connect_ws;
+pub mod register;
 mod screen_processor;
 mod task;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeviceStatus {
-    Discovered,
-    Connected,
-}
-
-/// 设备信息
-#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize)]
-pub struct DeviceInfo {
-    pub device_id: String,
-    pub screen_width: u16,
-    pub screen_height: u16,
-    pub screen_refresh_interval: usize,
-    pub screen_config: ScreenConfig,
-}
-
-/// 屏幕旋转角度
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Archive, RkyvSerialize, RkyvDeserialize)]
-pub enum ScreenRotation {
-    /// 不旋转（0度）
-    #[default]
-    Rotate0,
-    /// 顺时针旋转90度
-    Rotate90,
-    /// 旋转180度
-    Rotate180,
-    /// 顺时针旋转270度（逆时针90度）
-    Rotate270,
-}
-
-/// 屏幕配置
-#[derive(Debug, Clone, Copy, PartialEq, Default, Eq, Archive, RkyvSerialize, RkyvDeserialize)]
-pub struct ScreenConfig {
-    /// 旋转角度
-    pub rotation: ScreenRotation,
-    /// 水平镜像
-    pub mirror_horizontal: bool,
-    /// 垂直镜像
-    pub mirror_vertical: bool,
-}
 
 #[derive(Debug)]
 pub struct Device {
     pub info: DeviceInfo,
-    pub addr: Option<SocketAddr>,
-    pub status: DeviceStatus,
+    pub page_id: Option<Uuid>,
+    pub key_sender: Option<mpsc::UnboundedSender<KeyCode>>,
     pub ws_sender: Option<mpsc::UnboundedSender<Message>>,
-    pub page_id: Option<String>,
+    pub key_handle_task: Option<JoinHandle<Result<()>>>,
     pub screen_refresh_task: Option<JoinHandle<Result<()>>>,
-    pub screen_refresh_task_switch: bool,
     pub cancellation_token: CancellationToken,
 }
 
@@ -73,86 +30,45 @@ impl Device {
     pub fn new(info: DeviceInfo) -> Self {
         Self {
             info,
-            addr: None,
-            status: DeviceStatus::Discovered,
-            ws_sender: None,
             page_id: None,
+            key_sender: None,
+            ws_sender: None,
+            key_handle_task: None,
             screen_refresh_task: None,
-            screen_refresh_task_switch: true,
             cancellation_token: CancellationToken::new(),
         }
     }
 
-    pub async fn connect(
+    pub async fn start_key_handle(
+        &mut self,
+        browser_control: Arc<RwLock<BrowserControl>>,
+        page_id: Uuid,
+    ) -> Result<()> {
+        let (key_sender, key_receiver) = mpsc::unbounded_channel();
+        self.key_sender = Some(key_sender);
+        self.key_handle_task =
+            Some(start_key_handle(page_id.to_string(), key_receiver, browser_control).await?);
+        Ok(())
+    }
+
+    pub async fn start_screen_push(
         &mut self,
         devices: Arc<RwLock<HashMap<String, Device>>>,
         browser_control: Arc<RwLock<BrowserControl>>,
-        page_id: &str,
+        page_id: Uuid,
         screenshot_selector: Option<String>,
     ) -> Result<()> {
-        if self.status == DeviceStatus::Connected {
-            return Err(EdgeDeviceControlError::DeviceStatus(format!(
-                "device {} is already connected",
-                self.info.device_id
-            )));
-        }
-
-        // 创建新的取消 token
-        let cancellation_token = CancellationToken::new();
-        self.cancellation_token = cancellation_token.clone();
-
-        if let Some(addr) = &self.addr {
-            self.ws_sender = Some(
-                connect_ws(
-                    *addr,
-                    self.info.device_id.clone(),
-                    devices.clone(),
-                    browser_control.clone(),
-                    cancellation_token.clone(),
-                )
-                .await?,
-            );
-
-            // 启动断开监听任务
-            let device_id = self.info.device_id.clone();
-            let devices_clone = devices.clone();
-            let cancellation_token_for_listener = cancellation_token.clone();
-
-            tokio::spawn(async move {
-                cancellation_token_for_listener.cancelled().await;
-                // 连接断开，更新设备状态为 Discovered（可重连）
-                let mut devices_guard = devices_clone.write().await;
-                if let Some(device) = devices_guard.get_mut(&device_id) {
-                    info!(
-                        "Device {} disconnected, setting status to Discovered",
-                        device_id
-                    );
-                    device.status = DeviceStatus::Discovered;
-                    device.ws_sender = None;
-                    if let Some(screen_refresh_task) = &device.screen_refresh_task {
-                        screen_refresh_task.abort();
-                    }
-                }
-            });
-        } else {
-            // TODO 暂时只支持服务端主动连接设备
-            return Err(EdgeDeviceControlError::DeviceStatus(format!(
-                "device {} is not connected",
-                self.info.device_id
-            )));
-        }
-        let screen_refresh_task = start_screen_refresh(
-            self.info.clone(),
-            devices.clone(),
-            browser_control.clone(),
-            page_id,
-            screenshot_selector.clone(),
-            cancellation_token,
-        )
-        .await?;
-        self.screen_refresh_task = Some(screen_refresh_task);
-
-        self.status = DeviceStatus::Connected;
+        self.screen_refresh_task = Some(
+            start_screen_refresh(
+                self.info.clone(),
+                devices.clone(),
+                browser_control.clone(),
+                page_id,
+                screenshot_selector.clone(),
+                self.cancellation_token.clone(),
+            )
+            .await?,
+        );
 
         Ok(())
     }

@@ -1,5 +1,6 @@
 use crate::error::*;
 use crate::EdgeDeviceControl;
+use nihility_module_browser_control::func::close_page::ClosePageParam;
 use nihility_module_browser_control::func::open_page::OpenPageParam;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -28,6 +29,23 @@ impl EdgeDeviceControl {
         let device = devices_guard.get_mut(&param.device_id).ok_or_else(|| {
             EdgeDeviceControlError::DeviceStatus(format!("device {} not found", param.device_id))
         })?;
+
+        if let Some(task) = &device.screen_refresh_task {
+            task.abort();
+        }
+        if let Some(task) = &device.key_handle_task {
+            task.abort();
+        }
+        if let Some(page_id) = device.page_id {
+            self.browser_control
+                .as_ref()
+                .unwrap()
+                .write()
+                .await
+                .close_page(ClosePageParam { page_id })
+                .await?;
+        }
+
         let page_id = self
             .browser_control
             .as_ref()
@@ -38,19 +56,22 @@ impl EdgeDeviceControl {
                 url: param.mapping_url.to_string(),
             })
             .await?;
-        device.page_id = Some(page_id.clone());
+        device.page_id = Some(page_id);
         info!(
             "connect to device {} with page id: {}",
             param.device_id, page_id
         );
 
         device
-            .connect(
+            .start_screen_push(
                 self.devices.clone(),
                 self.browser_control.as_ref().unwrap().clone(),
-                &page_id,
+                page_id,
                 param.screenshot_selector,
             )
+            .await?;
+        device
+            .start_key_handle(self.browser_control.as_ref().unwrap().clone(), page_id)
             .await?;
         Ok(())
     }

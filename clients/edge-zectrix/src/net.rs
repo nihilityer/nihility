@@ -3,11 +3,9 @@ use anyhow::anyhow;
 use anyhow::Result;
 use esp_hal::efuse::Efuse;
 
-pub mod mdns;
 pub mod wifi;
 
 pub(crate) const MAX_RETRY_COUNT: usize = 30;
-pub(crate) const SERVICE_PORT: u16 = 5000;
 
 pub fn get_device_id() -> Result<String> {
     let mut buf = [0u8; 8];

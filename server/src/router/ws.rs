@@ -5,7 +5,7 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
 use axum::Router;
-use tracing::error;
+use tracing::{debug, error};
 
 pub fn ws_router() -> Router<AppState> {
     Router::new()
@@ -17,6 +17,7 @@ async fn edge_device_control(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
 ) -> Result<Response> {
+    debug!("WS edge device control");
     let edge_device_control = state.module_manager.get_edge_device_control()?;
     let web_socket_sender = edge_device_control.read().await.get_web_socket_sender();
     Ok(ws.on_upgrade(|socket| async move {

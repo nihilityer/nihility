@@ -1,11 +1,8 @@
-//! 屏幕处理器
-//!
-//! 集成了屏幕转换和差异检测功能
-
-use crate::device::{ScreenConfig, ScreenRotation};
 use crate::error::*;
 use image::{DynamicImage, GenericImageView};
-use nihility_edge_protocol::{FullScreenData, IncrementalScreenData, UpdateRegion};
+use nihility_edge_protocol::{
+    FullScreenData, IncrementalScreenData, ScreenConfig, ScreenRotation, UpdateRegion,
+};
 
 /// 屏幕更新类型
 #[derive(Debug)]

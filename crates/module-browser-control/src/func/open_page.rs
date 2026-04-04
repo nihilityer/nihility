@@ -12,10 +12,10 @@ pub struct OpenPageParam {
 }
 
 impl BrowserControl {
-    pub async fn open_page(&mut self, param: OpenPageParam) -> Result<String> {
+    pub async fn open_page(&mut self, param: OpenPageParam) -> Result<Uuid> {
         let page = self.browser.new_page(param.url).await?;
         let page_id = Uuid::new_v4();
         self.page_map.insert(page_id, page);
-        Ok(page_id.to_string())
+        Ok(page_id)
     }
 }

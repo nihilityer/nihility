@@ -1,18 +1,21 @@
 mod device;
 pub mod error;
 pub mod func;
-mod utils;
 
 use crate::error::*;
 
+use crate::device::register::register_device;
 use crate::device::Device;
-use crate::utils::discovery::start_discovery;
 use axum::extract::ws::WebSocket;
 use nihility_module_browser_control::BrowserControl;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{mpsc, RwLock};
+use tokio::task::JoinHandle;
+use tokio::time::timeout;
+use tracing::warn;
 
 /// 语音识别结果
 #[derive(Debug, Clone)]
@@ -28,16 +31,16 @@ pub struct AsrResult {
 /// 边缘设备控制模块配置
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct EdgeDeviceControlConfig {
-    /// mDNS 服务类型，用于设备发现
-    /// 格式为 "_service._protocol.local."
-    /// 例如："_edge-device._tcp.local."
-    pub mdns_service_type: String,
+    /// 设备注册超时时间（秒），默认30秒
+    #[serde(default = "default_register_timeout")]
+    pub register_timeout_secs: u64,
 }
 
 pub struct EdgeDeviceControl {
     web_socket_sender: mpsc::UnboundedSender<WebSocket>,
     devices: Arc<RwLock<HashMap<String, Device>>>,
     browser_control: Option<Arc<RwLock<BrowserControl>>>,
+    web_socket_receive_task: JoinHandle<Result<()>>,
 }
 
 impl EdgeDeviceControl {
@@ -51,29 +54,37 @@ impl EdgeDeviceControl {
     pub async fn init(config: EdgeDeviceControlConfig) -> Result<Self> {
         let devices = Arc::new(RwLock::new(HashMap::new()));
 
-        let (web_socket_sender, _web_socket_receiver) = mpsc::unbounded_channel();
-        // 启动 mDNS 发现
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        start_discovery(&config.mdns_service_type, tx)?;
+        let (web_socket_sender, mut web_socket_receiver) = mpsc::unbounded_channel::<WebSocket>();
 
-        // 监听发现事件
-        let devices_clone = devices.clone();
-        tokio::spawn(async move {
-            while let Some((addr, device_info)) = rx.recv().await {
-                let mut devices = devices_clone.write().await;
-                let device = devices
-                    .entry(device_info.device_id.clone())
-                    .or_insert_with(|| Device::new(device_info));
-                device.addr = Some(addr);
+        let web_socket_devices = devices.clone();
+        let web_socket_receive_task = tokio::spawn(async move {
+            while let Some(web_socket) = web_socket_receiver.recv().await {
+                match timeout(
+                    Duration::from_secs(config.register_timeout_secs),
+                    register_device(web_socket, web_socket_devices.clone()),
+                )
+                .await
+                {
+                    Ok(register_result) => register_result?,
+                    Err(e) => {
+                        warn!("register device timeout: {}", e);
+                    }
+                }
             }
-            Result::Ok(())
+            Result::<()>::Ok(())
         });
 
         Ok(EdgeDeviceControl {
             web_socket_sender,
             devices,
             browser_control: None,
+            web_socket_receive_task,
         })
+    }
+
+    /// 停止接受新的设备连接
+    pub fn stop_register_devices(&self) {
+        self.web_socket_receive_task.abort();
     }
 
     /// 设置浏览器控制引用
@@ -87,10 +98,14 @@ impl EdgeDeviceControl {
     }
 }
 
+fn default_register_timeout() -> u64 {
+    30
+}
+
 impl Default for EdgeDeviceControlConfig {
     fn default() -> Self {
         Self {
-            mdns_service_type: "_edge-device._tcp.local.".to_string(),
+            register_timeout_secs: default_register_timeout(),
         }
     }
 }

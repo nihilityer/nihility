@@ -1,3 +1,4 @@
+use crate::func::close_page::ClosePageParam;
 use crate::func::open_page::OpenPageParam;
 use crate::func::press_key::PressKeyParam;
 use crate::func::screenshot::ScreenshotParam;
@@ -7,6 +8,7 @@ use schemars::schema_for;
 use serde_json::Value;
 use tracing::debug;
 
+pub mod close_page;
 pub mod open_page;
 pub mod press_key;
 pub mod screenshot;
@@ -37,6 +39,9 @@ impl Callable for BrowserControl {
             "open_page" => Ok(serde_json::to_value(
                 self.open_page(serde_json::from_value(param)?).await?,
             )?),
+            "close_page" => Ok(serde_json::to_value(
+                self.close_page(serde_json::from_value(param)?).await?,
+            )?),
             "press_key" => Ok(serde_json::to_value(
                 self.press_key(serde_json::from_value(param)?).await?,
             )?),
@@ -53,9 +58,7 @@ impl Callable for BrowserControl {
             func_name = %func_name,
             "Browser control does not support streaming"
         );
-        Err(anyhow::anyhow!(
-            "BrowserControl does not support streaming"
-        ))
+        Err(anyhow::anyhow!("BrowserControl does not support streaming"))
     }
 }
 
@@ -82,6 +85,13 @@ impl Module for BrowserControl {
                 tags: vec![],
                 params: serde_json::to_value(schema_for!(OpenPageParam))
                     .expect("browser control func open_page build param"),
+            },
+            FunctionMetadata {
+                name: "close_page".to_string(),
+                desc: "关闭网页".to_string(),
+                tags: vec![],
+                params: serde_json::to_value(schema_for!(ClosePageParam))
+                    .expect("browser control func close_page build param"),
             },
             FunctionMetadata {
                 name: "press_key".to_string(),

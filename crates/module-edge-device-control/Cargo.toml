@@ -31,4 +31,4 @@ tokio-util = { workspace = true }
 mdns-sd = { workspace = true }
 tokio-tungstenite = { workspace = true }
 image = { workspace = true }
-rkyv = { workspace = true }
+postcard = { workspace = true }

@@ -10,7 +10,6 @@
 extern crate alloc;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use log::info;
 use nihility_edge_zectrix::init;
 
 #[allow(unused)]
@@ -33,8 +32,7 @@ async fn main(spawner: Spawner) -> ! {
     init(spawner).await.expect("failed to init");
 
     loop {
-        info!("Hello world!");
-        Timer::after(Duration::from_secs(1)).await;
+        Timer::after(Duration::from_secs(10)).await;
     }
 
     // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0/examples

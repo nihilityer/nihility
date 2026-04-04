@@ -1,4 +1,4 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use anyhow::{anyhow, Result};
 use core::cell::Cell;
@@ -7,15 +7,30 @@ use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
 use esp_hal::peripherals::FLASH;
 use esp_storage::FlashStorage;
 use log::{error, info};
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+use postcard::{from_bytes, to_allocvec};
+use serde::{Deserialize, Serialize};
 
 static STORAGE: Mutex<Cell<Option<FlashStorage>>> = Mutex::new(Cell::new(None));
 
 /// WiFi 凭证结构
-#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WifiCredentials {
     pub ssid: String,
     pub password: String,
+}
+
+/// 服务器配置结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerConfig {
+    pub host: String,
+    pub port: u16,
+}
+
+/// 完整配置结构（存储 WiFi 凭证和服务器配置）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceConfig {
+    pub wifi: WifiCredentials,
+    pub server: ServerConfig,
 }
 
 /// 存储偏移量（从NVS分区后的自定义存储区域开始）
@@ -37,22 +52,17 @@ pub fn init_storage(flash: FLASH<'static>) -> Result<()> {
     Ok(())
 }
 
-/// 保存 WiFi 凭证到 Flash
-pub fn save_credentials(ssid: &str, password: &str) -> Result<()> {
+/// 保存完整配置到 Flash
+pub fn save_config(config: &DeviceConfig) -> Result<()> {
     // 验证输入
-    if ssid.len() > MAX_SSID_LEN {
+    if config.wifi.ssid.len() > MAX_SSID_LEN {
         return Err(anyhow!("ssid too long"));
     }
-    if password.len() > MAX_PASSWORD_LEN {
+    if config.wifi.password.len() > MAX_PASSWORD_LEN {
         return Err(anyhow!("password too long"));
     }
 
-    let creds = WifiCredentials {
-        ssid: ssid.to_string(),
-        password: password.to_string(),
-    };
-
-    let serialized = rkyv::to_bytes::<rkyv::rancor::Error>(&creds)?;
+    let serialized = to_allocvec(config)?;
     let data_len = serialized.len();
 
     // 准备写入数据：魔术字节 + 长度 + 序列化数据
@@ -79,16 +89,16 @@ pub fn save_credentials(ssid: &str, password: &str) -> Result<()> {
     });
 
     info!(
-        "WiFi credentials saved to flash at offset 0x{:X}",
+        "Device config saved to flash at offset 0x{:X}",
         CREDENTIALS_OFFSET
     );
     Ok(())
 }
 
-/// 从 Flash 加载 WiFi 凭证
+/// 从 Flash 加载完整配置
 ///
-/// 如果没有保存的凭证或数据无效，返回 None
-pub fn load_credentials() -> Result<Option<WifiCredentials>> {
+/// 如果没有保存的配置或数据无效，返回 None
+pub fn load_config() -> Result<Option<DeviceConfig>> {
     // 读取魔术字节
     let mut magic = Vec::with_capacity_in(4, esp_alloc::ExternalMemory);
     magic.resize(4, 0);
@@ -105,7 +115,7 @@ pub fn load_credentials() -> Result<Option<WifiCredentials>> {
 
     // 验证魔术字节
     if magic != MAGIC_BYTES {
-        info!("No valid credentials found in flash (invalid magic bytes)");
+        info!("No valid config found in flash (invalid magic bytes)");
         return Ok(None);
     }
 
@@ -144,13 +154,16 @@ pub fn load_credentials() -> Result<Option<WifiCredentials>> {
     });
 
     // 反序列化
-    match rkyv::from_bytes::<WifiCredentials, rkyv::rancor::Error>(&buffer[..data_len]) {
-        Ok(creds) => {
-            info!("Loaded credentials from flash: SSID={}", creds.ssid);
-            Ok(Some(creds))
+    match from_bytes::<DeviceConfig>(&buffer[..data_len]) {
+        Ok(config) => {
+            info!(
+                "Loaded config from flash: SSID={}, Server={}:{}",
+                config.wifi.ssid, config.server.host, config.server.port
+            );
+            Ok(Some(config))
         }
         Err(e) => {
-            error!("Failed to deserialize credentials: {:?}", e);
+            error!("Failed to deserialize config: {:?}", e);
             Ok(None)
         }
     }

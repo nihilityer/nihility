@@ -2,7 +2,7 @@ extern crate alloc;
 
 use crate::net::get_device_id;
 use crate::net::wifi::{Network, KNOWN_SSIDS};
-use crate::storage::save_credentials;
+use crate::storage::{save_config, DeviceConfig, ServerConfig, WifiCredentials};
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -92,20 +92,23 @@ impl Handler for ConfigHandler {
                 conn.write_all(chunk).await?;
             }
         } else if method == Method::Post && path == "/save" {
-            // 分配一个缓冲区读取 POST 提交的数据，对于简单的 SSID 和密码，512 字节通常足够了
+            // 分配一个缓冲区读取 POST 提交的数据
             let mut body_buf = Vec::new_in(esp_alloc::ExternalMemory);
             body_buf.resize(1024, 0);
             let read_len = conn.read(&mut body_buf).await.unwrap_or(0);
             let body_str = core::str::from_utf8(&body_buf[..read_len]).unwrap_or("");
 
             // 极简解析 application/x-www-form-urlencoded
-            let (mut ssid, mut password) = ("", "");
+            let (mut ssid, mut password, mut server_host, mut server_port) =
+                ("", "", "", "8080");
             for pair in body_str.split('&') {
                 let mut parts = pair.splitn(2, '=');
                 if let (Some(key), Some(value)) = (parts.next(), parts.next()) {
                     match key {
                         "ssid" => ssid = value,
                         "password" => password = value,
+                        "server_host" => server_host = value,
+                        "server_port" => server_port = value,
                         _ => {}
                     }
                 }
@@ -114,20 +117,38 @@ impl Handler for ConfigHandler {
             // URL Decode：适配中文 SSID 和特殊字符密码
             let decoded_ssid = url_decode(ssid);
             let decoded_password = url_decode(password);
+            let decoded_host = url_decode(server_host);
+            let decoded_port = url_decode(server_port);
+
+            // 解析端口号，默认 8080
+            let port: u16 = decoded_port.parse().unwrap_or(8080);
 
             info!(
-                "收到配置 - SSID: {}, 密码长度: {}",
+                "收到配置 - SSID: {}, 服务器: {}:{}",
                 decoded_ssid,
-                decoded_password.len()
+                decoded_host,
+                port
             );
 
+            // 构建配置结构
+            let config = DeviceConfig {
+                wifi: WifiCredentials {
+                    ssid: decoded_ssid,
+                    password: decoded_password,
+                },
+                server: ServerConfig {
+                    host: decoded_host,
+                    port,
+                },
+            };
+
             // 尝试保存并返回响应
-            match save_credentials(&decoded_ssid, &decoded_password) {
+            match save_config(&config) {
                 Ok(_) => {
                     conn.initiate_response(200, Some("OK"), &[]).await?;
                 }
                 Err(e) => {
-                    error!("保存凭据失败：{:?}", e);
+                    error!("保存配置失败：{:?}", e);
                     conn.initiate_response(500, Some("Internal Server Error"), &[])
                         .await?;
                 }

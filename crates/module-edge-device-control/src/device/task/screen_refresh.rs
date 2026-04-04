@@ -10,13 +10,14 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
+use uuid::Uuid;
 
 /// 新建一个线程处理设备屏幕刷新推送
 pub(crate) async fn start_screen_refresh(
     device_info: DeviceInfo,
     devices: Arc<RwLock<HashMap<String, Device>>>,
     browser_control: Arc<RwLock<BrowserControl>>,
-    page_id: &str,
+    page_id: Uuid,
     screenshot_selector: Option<String>,
     cancellation_token: CancellationToken,
 ) -> Result<JoinHandle<Result<()>>> {
@@ -48,29 +49,6 @@ pub(crate) async fn start_screen_refresh(
                     info!("Screen refresh task for device {} cancelled", device_info.device_id);
                     break;
                 }
-            }
-
-            // 检查设备是否还存在
-            let should_continue = {
-                let devices_guard = devices.read().await;
-                match devices_guard.get(&device_info.device_id) {
-                    Some(device) => device.screen_refresh_task_switch,
-                    None => {
-                        info!(
-                            "Device {} not found, stopping screen refresh",
-                            device_info.device_id
-                        );
-                        break;
-                    }
-                }
-            };
-
-            if !should_continue {
-                info!(
-                    "Screen refresh task for device {} stopping",
-                    device_info.device_id
-                );
-                break;
             }
 
             let png_data = browser_control

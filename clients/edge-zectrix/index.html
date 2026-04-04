@@ -556,6 +556,23 @@
                 </div>
             </div>
 
+            <!-- Server Configuration -->
+            <div class="form-group">
+                <label class="label">服务器地址</label>
+                <div class="input-wrap">
+                    <input class="input-field" id="input-server-host" oninput="checkForm()"
+                           placeholder="例如: 192.168.1.100" type="text" value="">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="label">服务器端口</label>
+                <div class="input-wrap">
+                    <input class="input-field" id="input-server-port" oninput="checkForm()"
+                           placeholder="8080" type="text" value="8080">
+                </div>
+            </div>
+
             <!-- Action Button -->
             <button class="submit-btn" disabled id="btn-submit" onclick="submitConfig()">
                 <svg class="spin hidden" fill="none" height="20" id="submit-spinner" style="margin-right: 0.5rem;"
@@ -734,18 +751,24 @@
     function checkForm() {
         const manualSsid = $('input-ssid').value.trim();
         const pwd = $('input-pwd').value;
+        const serverHost = $('input-server-host').value.trim();
+        const serverPort = $('input-server-port').value.trim();
         const currentSsid = currentMode === 'list' ? selectedSsid : manualSsid;
 
-        $('btn-submit').disabled = !(currentSsid && pwd);
+        // 检查必填字段：SSID、密码、服务器地址和端口
+        const isValid = currentSsid && pwd && serverHost && serverPort;
+        $('btn-submit').disabled = !isValid;
     }
 
     // 提交配置
     async function submitConfig() {
         const manualSsid = $('input-ssid').value.trim();
         const pwd = $('input-pwd').value;
+        const serverHost = $('input-server-host').value.trim();
+        const serverPort = $('input-server-port').value.trim();
         const currentSsid = currentMode === 'list' ? selectedSsid : manualSsid;
 
-        if (!currentSsid || !pwd) return;
+        if (!currentSsid || !pwd || !serverHost || !serverPort) return;
 
         // UI 加载状态
         $('btn-submit').disabled = true;
@@ -756,6 +779,8 @@
         const params = new URLSearchParams();
         params.append('ssid', currentSsid);
         params.append('password', pwd);
+        params.append('server_host', serverHost);
+        params.append('server_port', serverPort);
 
         try {
             const res = await fetch('/save', {

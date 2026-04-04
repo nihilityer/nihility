@@ -1,14 +1,16 @@
+use crate::device_info::DeviceInfo;
 use crate::{
     audio::AudioData,
     key::KeyEvent,
     screen::{FullScreenData, IncrementalScreenData},
 };
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+use serde::{Deserialize, Serialize};
 
 /// 双向消息枚举
-#[derive(Debug, Clone, Archive, RkyvSerialize, RkyvDeserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Message {
     // 设备发送的消息
+    DeviceInfo(DeviceInfo),
     KeyEvent(KeyEvent),
     AudioData(AudioData),
 
