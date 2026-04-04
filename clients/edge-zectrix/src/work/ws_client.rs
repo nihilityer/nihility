@@ -1,6 +1,6 @@
-use crate::display;
 use crate::net::get_device_id;
 use crate::storage::ServerConfig;
+use crate::DISPLAY_CHANNEL;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use anyhow::{bail, Result};
@@ -145,40 +145,19 @@ async fn run_ws_client_once(
     // 构建并发送设备信息
     send_message(&mut socket, &Message::DeviceInfo(build_device_info()), rng).await?;
     info!("DeviceInfo sent");
-
-    // 消息接收循环（带心跳）
-    // let mut last_heartbeat = embassy_time::Instant::now();
+    let display_sender = DISPLAY_CHANNEL.sender();
 
     loop {
-        // 检查是否需要发送心跳
-        // if last_heartbeat.elapsed().as_secs() >= HEARTBEAT_INTERVAL_SECS {
-        //     let header = FrameHeader {
-        //         frame_type: FrameType::Ping,
-        //         payload_len: 0,
-        //         mask_key: rng.random().into(),
-        //     };
-        //     header.send(&mut socket).await?;
-        //     info!("Heartbeat sent");
-        //     last_heartbeat = embassy_time::Instant::now();
-        // }
-
         // 使用超时接收消息
         match recv_message(&mut socket, &mut msg_buf).await {
             Ok(msg) => match msg {
                 Message::FullScreenUpdate(data) => {
-                    info!("Received FullScreenUpdate: {}x{}", data.width, data.height);
-                    if let Err(e) = display::full_screen_update(&data.data) {
-                        error!("Full screen update failed: {:?}", e);
-                    }
+                    display_sender.send(Message::FullScreenUpdate(data)).await
                 }
                 Message::IncrementalScreenUpdate(data) => {
-                    info!(
-                        "Received IncrementalScreenUpdate: {} regions",
-                        data.regions.len()
-                    );
-                    if let Err(e) = display::incremental_screen_update(&data.regions) {
-                        error!("Incremental screen update failed: {:?}", e);
-                    }
+                    display_sender
+                        .send(Message::IncrementalScreenUpdate(data))
+                        .await
                 }
                 _ => {
                     info!("Received unexpected message type: {:?}", msg);

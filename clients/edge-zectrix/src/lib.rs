@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-use crate::display::{init_and_clear_screen, init_display};
+use crate::display::display_task;
 use crate::net::wifi::{dhcp_task, net_task, run_ap_mode, run_client_mode, AP_SSID, GW_IP};
 use crate::net::{get_device_id, MAX_RETRY_COUNT};
 use crate::storage::{clear_credentials, init_storage, load_config};
@@ -17,18 +17,23 @@ use core::net::Ipv4Addr;
 use core::str::FromStr;
 use embassy_executor::Spawner;
 use embassy_net::{Config, DhcpConfig, StackResources};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::channel::Channel;
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::CpuClock;
 use esp_hal::rng::Rng;
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::wifi::{AccessPointConfig, ClientConfig};
 use log::{error, info};
+use nihility_edge_protocol::Message;
 use smoltcp::wire::Ipv4Cidr;
 
 mod display;
 mod net;
 mod storage;
 mod work;
+
+static DISPLAY_CHANNEL: Channel<CriticalSectionRawMutex, Message, 8> = Channel::new();
 
 pub async fn init(spawner: Spawner) -> Result<()> {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -47,7 +52,8 @@ pub async fn init(spawner: Spawner) -> Result<()> {
     }
 
     init_storage(peripherals.FLASH)?;
-    init_display(
+
+    spawner.spawn(display_task(
         peripherals.GPIO8,
         peripherals.GPIO9,
         peripherals.GPIO10,
@@ -55,10 +61,7 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         peripherals.SPI3,
         peripherals.GPIO12,
         peripherals.GPIO13,
-    )?;
-
-    // 初始化并清空屏幕（显示全白）
-    init_and_clear_screen()?;
+    ))?;
 
     let config = load_config()?;
 
