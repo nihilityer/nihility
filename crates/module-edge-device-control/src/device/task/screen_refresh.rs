@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 /// 新建一个线程处理设备屏幕刷新推送
@@ -70,7 +70,7 @@ pub(crate) async fn start_screen_refresh(
             // 根据更新类型决定是否发送消息
             match processor.diff(full_screen) {
                 ScreenUpdate::Full(full_screen) => {
-                    info!("Full screen update -> {}", device_info.device_id);
+                    debug!("Full screen update -> {}", device_info.device_id);
                     let msg = Message::FullScreenUpdate(full_screen);
 
                     let devices_guard = devices.read().await;
@@ -94,7 +94,7 @@ pub(crate) async fn start_screen_refresh(
                     })?;
                 }
                 ScreenUpdate::Incremental(incremental) => {
-                    info!("Incremental update -> {}", device_info.device_id);
+                    debug!("Incremental update -> {}", device_info.device_id);
                     let msg = Message::IncrementalScreenUpdate(incremental);
 
                     let devices_guard = devices.read().await;
