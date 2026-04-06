@@ -4,6 +4,7 @@
 
 extern crate alloc;
 
+use crate::audio::audio_task;
 use crate::display::display_task;
 use crate::input::button_task;
 use crate::net::wifi::{dhcp_task, net_task, run_ap_mode, run_client_mode, AP_SSID, GW_IP};
@@ -14,6 +15,7 @@ use crate::work::ws_client::run_ws_client;
 use alloc::boxed::Box;
 use alloc::format;
 use anyhow::Result;
+use core::cell::RefCell;
 use core::net::Ipv4Addr;
 use core::str::FromStr;
 use embassy_executor::Spawner;
@@ -21,14 +23,19 @@ use embassy_net::{Config, DhcpConfig, StackResources};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_time::{Duration, Timer};
+use embedded_hal_bus::i2c::RefCellDevice;
 use esp_hal::clock::CpuClock;
+use esp_hal::i2c;
+use esp_hal::i2c::master::I2c;
 use esp_hal::rng::Rng;
+use esp_hal::time::Rate;
 use esp_hal::timer::timg::TimerGroup;
 use esp_radio::wifi::{AccessPointConfig, ClientConfig};
 use log::{error, info};
 use nihility_edge_protocol::Message;
 use smoltcp::wire::Ipv4Cidr;
 
+mod audio;
 mod display;
 mod input;
 mod net;
@@ -53,6 +60,18 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         let _epd_pwr = Output::new(peripherals.GPIO6, Level::High, OutputConfig::default());
     }
 
+    let i2c = Box::leak(Box::new_in(
+        RefCell::new(
+            I2c::new(
+                peripherals.I2C0,
+                i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
+            )?
+            .with_sda(peripherals.GPIO47)
+            .with_scl(peripherals.GPIO48),
+        ),
+        esp_alloc::ExternalMemory,
+    ));
+
     init_storage(peripherals.FLASH)?;
 
     spawner.spawn(display_task(
@@ -70,6 +89,18 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         peripherals.GPIO39,
         peripherals.GPIO18,
     ))?;
+
+    // spawner.spawn(audio_task(
+    //     peripherals.I2S0,
+    //     peripherals.DMA_CH1,
+    //     peripherals.GPIO14,
+    //     peripherals.GPIO38,
+    //     peripherals.GPIO15,
+    //     peripherals.GPIO16,
+    //     peripherals.GPIO45,
+    //     peripherals.GPIO46,
+    //     RefCellDevice::new(i2c),
+    // ))?;
 
     let config = load_config()?;
 

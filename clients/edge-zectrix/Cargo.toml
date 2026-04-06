@@ -57,6 +57,8 @@ embassy-futures = { version = "0.1" }
 
 embedded-io-async = "0.7.0"
 embedded-storage = { version = "0.3" }
+embedded-hal = { version = "1.0" }
+embedded-hal-bus = { version = "0.3" }
 
 smoltcp = { version = "0.12.0", default-features = false, features = [
     "log",
