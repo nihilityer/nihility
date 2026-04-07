@@ -42,7 +42,8 @@ mod net;
 mod storage;
 mod work;
 
-static DISPLAY_CHANNEL: Channel<CriticalSectionRawMutex, Message, 8> = Channel::new();
+static FROM_SERVER_CHANNEL: Channel<CriticalSectionRawMutex, Message, 8> = Channel::new();
+static TO_SERVER_CHANNEL: Channel<CriticalSectionRawMutex, Message, 8> = Channel::new();
 
 pub async fn init(spawner: Spawner) -> Result<()> {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -90,17 +91,17 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         peripherals.GPIO18,
     ))?;
 
-    // spawner.spawn(audio_task(
-    //     peripherals.I2S0,
-    //     peripherals.DMA_CH1,
-    //     peripherals.GPIO14,
-    //     peripherals.GPIO38,
-    //     peripherals.GPIO15,
-    //     peripherals.GPIO16,
-    //     peripherals.GPIO45,
-    //     peripherals.GPIO46,
-    //     RefCellDevice::new(i2c),
-    // ))?;
+    spawner.spawn(audio_task(
+        peripherals.I2S0,
+        peripherals.DMA_CH1,
+        peripherals.GPIO14,
+        peripherals.GPIO38,
+        peripherals.GPIO15,
+        peripherals.GPIO16,
+        peripherals.GPIO45,
+        peripherals.GPIO46,
+        RefCellDevice::new(i2c),
+    ))?;
 
     let config = load_config()?;
 

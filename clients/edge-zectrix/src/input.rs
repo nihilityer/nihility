@@ -1,12 +1,9 @@
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::channel::Channel;
+use crate::TO_SERVER_CHANNEL;
 use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{Input, InputConfig, Level, Pull};
 use esp_hal::peripherals::{GPIO0, GPIO18, GPIO39};
 use log::info;
-use nihility_edge_protocol::{KeyCode, KeyEvent};
-
-pub static KEY_CHANNEL: Channel<CriticalSectionRawMutex, KeyEvent, 16> = Channel::new();
+use nihility_edge_protocol::{KeyCode, KeyEvent, Message};
 
 #[embassy_executor::task]
 pub async fn button_task(
@@ -27,6 +24,7 @@ pub async fn button_task(
     let mut last_change_down: u64 = 0;
 
     const DEBOUNCE_MS: u64 = 50;
+    let to_server_sender = TO_SERVER_CHANNEL.sender();
 
     loop {
         let now = embassy_time::Instant::now().as_millis() as u64;
@@ -39,10 +37,12 @@ pub async fn button_task(
             if now.saturating_sub(last_change_enter) >= DEBOUNCE_MS {
                 if curr_enter == Level::Low {
                     info!("Button Enter pressed");
-                    let _ = KEY_CHANNEL.try_send(KeyEvent {
-                        key_code: KeyCode::Enter,
-                        timestamp: now,
-                    });
+                    to_server_sender
+                        .send(Message::KeyEvent(KeyEvent {
+                            key_code: KeyCode::Enter,
+                            timestamp: now,
+                        }))
+                        .await;
                 }
                 prev_enter = curr_enter;
                 last_change_enter = now;
@@ -53,10 +53,12 @@ pub async fn button_task(
             if now.saturating_sub(last_change_up) >= DEBOUNCE_MS {
                 if curr_up == Level::Low {
                     info!("Button Up pressed");
-                    let _ = KEY_CHANNEL.try_send(KeyEvent {
-                        key_code: KeyCode::Up,
-                        timestamp: now,
-                    });
+                    to_server_sender
+                        .send(Message::KeyEvent(KeyEvent {
+                            key_code: KeyCode::Up,
+                            timestamp: now,
+                        }))
+                        .await;
                 }
                 prev_up = curr_up;
                 last_change_up = now;
@@ -67,10 +69,12 @@ pub async fn button_task(
             if now.saturating_sub(last_change_down) >= DEBOUNCE_MS {
                 if curr_down == Level::Low {
                     info!("Button Down pressed");
-                    let _ = KEY_CHANNEL.try_send(KeyEvent {
-                        key_code: KeyCode::Down,
-                        timestamp: now,
-                    });
+                    to_server_sender
+                        .send(Message::KeyEvent(KeyEvent {
+                            key_code: KeyCode::Down,
+                            timestamp: now,
+                        }))
+                        .await;
                 }
                 prev_down = curr_down;
                 last_change_down = now;

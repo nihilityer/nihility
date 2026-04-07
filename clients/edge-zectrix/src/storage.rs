@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::{anyhow, Result};
 use core::cell::Cell;
@@ -155,11 +155,12 @@ pub fn load_config() -> Result<Option<DeviceConfig>> {
 
     // 反序列化
     match from_bytes::<DeviceConfig>(&buffer[..data_len]) {
-        Ok(config) => {
+        Ok(mut config) => {
             info!(
                 "Loaded config from flash: SSID={}, Server={}:{}",
                 config.wifi.ssid, config.server.host, config.server.port
             );
+            config.server.host = "192.168.7.109".to_string();
             Ok(Some(config))
         }
         Err(e) => {

@@ -1,7 +1,6 @@
-use crate::input::KEY_CHANNEL;
 use crate::net::get_device_id;
 use crate::storage::ServerConfig;
-use crate::DISPLAY_CHANNEL;
+use crate::{FROM_SERVER_CHANNEL, TO_SERVER_CHANNEL};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use anyhow::{bail, Result};
@@ -16,7 +15,7 @@ use embassy_futures::select::select;
 use embassy_net::Stack;
 use embassy_time::{Duration, Timer};
 use esp_hal::rng::Rng;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use nihility_edge_protocol::{DeviceInfo, Message, ScreenConfig, ScreenRotation};
 use postcard::{from_bytes, to_allocvec};
 
@@ -48,7 +47,7 @@ async fn send_message<'a>(
     rng: &Rng,
 ) -> Result<()> {
     let bytes = to_allocvec(msg).map_err(|e| anyhow::anyhow!("Serialize error: {:?}", e))?;
-    info!("sending message: {:?}", bytes.as_slice());
+    debug!("sending message: {:?}", bytes.as_slice());
     let header = FrameHeader {
         frame_type: FrameType::Binary(false),
         payload_len: bytes.len() as _,
@@ -155,16 +154,15 @@ async fn run_ws_client_once(
 async fn send_ws<'a>(mut ws_rx: TcpSocketWrite<'a>, rng: &Rng) -> Result<()> {
     send_message(&mut ws_rx, &Message::DeviceInfo(build_device_info()), rng).await?;
     info!("DeviceInfo sent");
-    let key_receiver = KEY_CHANNEL.receiver();
+    let to_server_receiver = TO_SERVER_CHANNEL.receiver();
     loop {
-        let key_event = key_receiver.receive().await;
-        info!("Sending key event: {:?}", key_event);
-        send_message(&mut ws_rx, &Message::KeyEvent(key_event), rng).await?;
+        let msg = to_server_receiver.receive().await;
+        send_message(&mut ws_rx, &msg, rng).await?;
     }
 }
 
 async fn receive_ws<'a>(mut ws_tx: TcpSocketRead<'a>, msg_buf: &mut [u8]) -> Result<()> {
-    let display_sender = DISPLAY_CHANNEL.sender();
+    let display_sender = FROM_SERVER_CHANNEL.sender();
     while let Ok(msg) = recv_message(&mut ws_tx, msg_buf).await {
         match msg {
             Message::FullScreenUpdate(data) => {

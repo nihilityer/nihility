@@ -3,7 +3,7 @@ mod epd_trait;
 
 use crate::display::epd::EpdInterface;
 use crate::display::epd_trait::EpdDisplay;
-use crate::DISPLAY_CHANNEL;
+use crate::FROM_SERVER_CHANNEL;
 use alloc::vec::Vec;
 use anyhow::Result;
 use epd::Display;
@@ -40,7 +40,7 @@ pub async fn display_task(
         }
     }
 
-    let receiver = DISPLAY_CHANNEL.receiver();
+    let receiver = FROM_SERVER_CHANNEL.receiver();
     loop {
         let message = receiver.receive().await;
         match message {
