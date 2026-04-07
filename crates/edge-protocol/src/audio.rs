@@ -7,6 +7,4 @@ use serde::{Deserialize, Serialize};
 pub struct AudioData {
     /// PCM 32bit 浮点音频数据
     pub audio_data: Vec<f32>,
-    /// 时间戳（毫秒）
-    pub timestamp: u64,
 }

@@ -32,3 +32,4 @@ mdns-sd = { workspace = true }
 tokio-tungstenite = { workspace = true }
 image = { workspace = true }
 postcard = { workspace = true }
+hound = { workspace = true }

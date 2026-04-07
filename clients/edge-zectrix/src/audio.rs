@@ -111,14 +111,21 @@ async fn record(mut i2s_rx: I2sRx<'static, Async>) {
             mono_f32[i] = s as f32 / 32768.0;
         }
         accum_buffer.extend_from_slice(&mono_f32[..MONO_SAMPLES_PER_READ]);
+
         if accum_buffer.len() >= CHUNK_SIZE {
             sender
                 .send(Message::AudioData(AudioData {
-                    audio_data: accum_buffer.to_vec(),
-                    timestamp: 0,
+                    audio_data: accum_buffer[..CHUNK_SIZE].to_vec(),
                 }))
                 .await;
-            accum_buffer.clear();
+
+            if accum_buffer.len() > CHUNK_SIZE {
+                let remaining = accum_buffer[CHUNK_SIZE..].to_vec();
+                accum_buffer.clear();
+                accum_buffer.extend_from_slice(&remaining);
+            } else {
+                accum_buffer.clear();
+            }
         }
     }
 }
