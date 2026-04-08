@@ -175,6 +175,7 @@ pub(crate) async fn start_message_handle(
 /// - 通道数: 1 (单通道)
 /// - 位深: 16bit
 fn write_wav_file(file_path: &PathBuf, pcm_data: &[f32]) -> Result<()> {
+    // return Ok(());
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 16000,

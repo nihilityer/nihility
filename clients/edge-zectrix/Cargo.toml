@@ -81,6 +81,7 @@ critical-section = "1.2.0"
 anyhow = { version = "1.0", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+strum = { version = "0.28", default-features = false, features = ["derive"] }
 
 edge-dhcp = { version = "0.7" }
 edge-http = { version = "0.7" }

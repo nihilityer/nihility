@@ -1,1538 +1,281 @@
-#![no_std]
-#![allow(unused)]
+pub use config::*;
+use embedded_hal::{
+    delay::DelayNs,
+    i2c::{Error as I2cError, I2c},
+};
+pub use error::Error;
+use log::info;
+use register::Register;
 
-use embedded_hal::delay::DelayNs;
-use embedded_hal::i2c::I2c;
-use esp_hal::delay::Delay;
+mod config;
+mod error;
+mod register;
 
-// Register addresses
-const RESET_REG00: u8 = 0x00;
-const CLK_MANAGER_REG01: u8 = 0x01;
-const CLK_MANAGER_REG02: u8 = 0x02;
-const CLK_MANAGER_REG03: u8 = 0x03;
-const CLK_MANAGER_REG04: u8 = 0x04;
-const CLK_MANAGER_REG05: u8 = 0x05;
-const CLK_MANAGER_REG06: u8 = 0x06;
-const CLK_MANAGER_REG07: u8 = 0x07;
-const CLK_MANAGER_REG08: u8 = 0x08;
-const SDPIN_REG09: u8 = 0x09;
-const SDPOUT_REG0A: u8 = 0x0A;
-const SYSTEM_REG0B: u8 = 0x0B;
-const SYSTEM_REG0C: u8 = 0x0C;
-const SYSTEM_REG0D: u8 = 0x0D;
-const SYSTEM_REG0E: u8 = 0x0E;
-const SYSTEM_REG0F: u8 = 0x0F;
-const SYSTEM_REG10: u8 = 0x10;
-const SYSTEM_REG11: u8 = 0x11;
-const SYSTEM_REG12: u8 = 0x12;
-const SYSTEM_REG13: u8 = 0x13;
-const SYSTEM_REG14: u8 = 0x14;
-const ADC_REG15: u8 = 0x15;
-const ADC_REG16: u8 = 0x16;
-const ADC_REG17: u8 = 0x17;
-const ADC_REG18: u8 = 0x18;
-const ADC_REG19: u8 = 0x19;
-const ADC_REG1A: u8 = 0x1A;
-const ADC_REG1B: u8 = 0x1B;
-const ADC_REG1C: u8 = 0x1C;
-const DAC_REG31: u8 = 0x31;
-const DAC_REG32: u8 = 0x32;
-const DAC_REG33: u8 = 0x33;
-const DAC_REG34: u8 = 0x34;
-const DAC_REG35: u8 = 0x35;
-const DAC_REG37: u8 = 0x37;
-const GPIO_REG44: u8 = 0x44;
-const GP_REG45: u8 = 0x45;
-const CHD1_REGFD: u8 = 0xFD;
-const CHD2_REGFE: u8 = 0xFE;
-const CHVER_REGFF: u8 = 0xFF;
-
-// Types and enums
-
-/// Audio resolution (bit width).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Resolution {
-    Bits16 = 16,
-    Bits18 = 18,
-    Bits20 = 20,
-    Bits24 = 24,
-    Bits32 = 32,
+pub struct Es8311<I2C> {
+    i2c: I2C,
+    address: Address,
 }
 
-/// Microphone gain.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum MicGain {
-    Min = 0,
-    Gain0dB = 1,
-    Gain6dB = 2,
-    Gain12dB = 3,
-    Gain18dB = 4,
-    Gain24dB = 5,
-    Gain30dB = 6,
-    Gain36dB = 7,
-    Gain42dB = 8,
-    Max = 9,
-}
-
-/// Fade rate (number of LRCK cycles to ramp 0.25 dB).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Fade {
-    Off = 0,
-    LRCK4 = 1,
-    LRCK8 = 2,
-    LRCK16 = 3,
-    LRCK32 = 4,
-    LRCK64 = 5,
-    LRCK128 = 6,
-    LRCK256 = 7,
-    LRCK512 = 8,
-    LRCK1024 = 9,
-    LRCK2048 = 10,
-    LRCK4096 = 11,
-    LRCK8192 = 12,
-    LRCK16384 = 13,
-    LRCK32768 = 14,
-    LRCK65536 = 15,
-}
-
-/// Clock configuration for ES8311
-#[derive(Debug, Clone, Copy)]
-pub struct ClockConfig {
-    /// Invert MCLK signal.
-    pub mclk_inverted: bool,
-    /// Invert SCLK (BCLK) signal.
-    pub sclk_inverted: bool,
-    /// If true, MCLK comes from MCLK pin; if false, from SCLK pin.
-    pub mclk_from_mclk_pin: bool,
-    /// MCLK frequency in Hz (ignored if `mclk_from_mclk_pin` is false).
-    pub mclk_frequency: u32,
-    /// Desired sample rate in Hz.
-    pub sample_frequency: u32,
-}
-
-/// Driver error.
-#[derive(Debug)]
-pub enum Error<E> {
-    /// I2C communication error.
-    I2c(E),
-    /// Invalid configuration parameter.
-    InvalidConfig,
-    /// Sample rate / MCLK combination not supported.
-    NotSupported,
-}
-
-/// Main ES8311 driver struct – holds only the I2C address.
-pub struct Es8311 {
-    addr: u8,
-}
-
-impl Es8311 {
-    /// Create a new ES8311 instance.
-    pub fn new(addr: u8) -> Self {
-        Self { addr }
+impl<I2C: I2c<Error = E>, E: I2cError> Es8311<I2C> {
+    pub fn new(i2c: I2C, address: Address) -> Self {
+        Self { i2c, address }
     }
 
-    fn write_reg<I2C, E>(&self, i2c: &mut I2C, reg: u8, val: u8) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let buf = [reg, val];
-        i2c.write(self.addr, &buf).map_err(Error::I2c)
-    }
-
-    fn read_reg<I2C, E>(&self, i2c: &mut I2C, reg: u8) -> Result<u8, Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let mut buf = [0];
-        i2c.write_read(self.addr, &[reg], &mut buf)
-            .map_err(Error::I2c)?;
-        Ok(buf[0])
-    }
-
-    /// Initialize the codec with the given clock configuration and resolutions.
-    pub fn init<I2C, E>(
-        &self,
-        i2c: &mut I2C,
-        clk_cfg: &ClockConfig,
-        res_in: Resolution,
-        res_out: Resolution,
-    ) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        if !(8000..=96000).contains(&clk_cfg.sample_frequency) {
-            return Err(Error::InvalidConfig);
+    pub fn init(&mut self, config: &Config) -> Result<(), Error<E>> {
+        let regv = self.read_reg(Register::SystemReg0D)?;
+        if regv != 0xFA {
+            self.write_reg(Register::SystemReg0D, 0xFA)?;
         }
-        if !clk_cfg.mclk_from_mclk_pin && res_in != res_out {
-            return Err(Error::InvalidConfig);
-        }
+        self.write_reg(Register::GpioReg44, 0x08)?;
+        self.write_reg(Register::GpioReg44, 0x08)?;
 
-        // Reset
-        self.write_reg(i2c, RESET_REG00, 0x1F)?;
-        Delay::new().delay_ns(20_000_000);
-        self.write_reg(i2c, RESET_REG00, 0x00)?;
-        self.write_reg(i2c, RESET_REG00, 0x80)?; // Power-on command
+        self.write_reg(Register::ClkManagerReg01, 0x30)?;
+        self.write_reg(Register::ClkManagerReg02, 0x00)?;
+        self.write_reg(Register::ClkManagerReg03, 0x10)?;
+        self.write_reg(Register::AdcReg16, 0x24)?;
+        self.write_reg(Register::ClkManagerReg04, 0x10)?;
+        self.write_reg(Register::ClkManagerReg05, 0x00)?;
+        self.write_reg(Register::SystemReg0B, 0x00)?;
+        self.write_reg(Register::SystemReg0C, 0x00)?;
+        self.write_reg(Register::SystemReg10, 0x1F)?;
+        self.write_reg(Register::SystemReg11, 0x7F)?;
+        self.write_reg(Register::ResetReg00, 0x80)?;
 
-        // Configure clocks
-        self.clock_config(i2c, clk_cfg, res_out)?;
+        let regv = self.read_reg(Register::ResetReg00)? & 0xBF;
+        self.write_reg(Register::ResetReg00, regv)?;
 
-        // Configure audio format (SDP)
-        self.fmt_config(i2c, res_in, res_out)?;
+        self.clock_config(config)?;
 
-        // Power up analog circuitry and enable blocks
-        self.write_reg(i2c, SYSTEM_REG0D, 0x01)?;
-        self.write_reg(i2c, SYSTEM_REG0E, 0x02)?;
-        self.write_reg(i2c, SYSTEM_REG12, 0x00)?;
-        self.write_reg(i2c, SYSTEM_REG13, 0x10)?;
-        self.write_reg(i2c, ADC_REG1C, 0x6A)?;
-        self.write_reg(i2c, DAC_REG37, 0x08)?;
+        self.write_reg(Register::SystemReg13, 0x10)?;
+        self.write_reg(Register::AdcReg1B, 0x0A)?;
+        self.write_reg(Register::AdcReg1C, 0x6A)?;
+        self.write_reg(Register::GpioReg44, 0x08)?;
 
+        self.set_bits_per_sample(config)?;
+        self.config_fmt(config)?;
+        self.config_sample(config)?;
+
+        self.start()?;
         Ok(())
     }
 
-    /// Configure the clock dividers and sources.
-    fn clock_config<I2C, E>(
-        &self,
-        i2c: &mut I2C,
-        clk_cfg: &ClockConfig,
-        res_out: Resolution,
-    ) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let mut reg01 = 0x3F; // Enable all clocks
-
-        // Determine MCLK frequency
-        let mclk_hz = if clk_cfg.mclk_from_mclk_pin {
-            reg01 &= !0x80;
-            clk_cfg.mclk_frequency
+    fn clock_config(&mut self, config: &Config) -> Result<(), Error<E>> {
+        let mut reg01 = 0x3F;
+        if config.mclk.is_some() {
+            reg01 &= 0x7F;
         } else {
             reg01 |= 0x80;
-            clk_cfg.sample_frequency * (res_out as u32) * 2
-        };
-
-        if clk_cfg.mclk_inverted {
-            reg01 |= 0x40;
         }
-        self.write_reg(i2c, CLK_MANAGER_REG01, reg01)?;
 
-        // Configure SCLK polarity
-        let mut reg06 = self.read_reg(i2c, CLK_MANAGER_REG06)?;
-        if clk_cfg.sclk_inverted {
-            reg06 |= 0x20;
+        if config.mclk_inverted {
+            reg01 |= 1 << 6;
         } else {
-            reg06 &= !0x20;
+            reg01 &= !(1 << 6);
         }
-        self.write_reg(i2c, CLK_MANAGER_REG06, reg06)?;
+        self.write_reg(Register::ClkManagerReg01, reg01)?;
 
-        // Set sample rate dividers
-        self.sample_frequency_config(i2c, mclk_hz, clk_cfg.sample_frequency)
+        let mut reg06 = self.read_reg(Register::ClkManagerReg06)?;
+        if config.sclk_inverted {
+            reg06 |= 1 << 5;
+        } else {
+            reg06 &= !(1 << 5);
+        }
+        self.write_reg(Register::ClkManagerReg06, reg06)
     }
 
-    /// Configure the sample rate dividers for a given MCLK and sample rate.
-    pub fn sample_frequency_config<I2C, E>(
-        &self,
-        i2c: &mut I2C,
-        mclk_hz: u32,
-        sample_hz: u32,
-    ) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let coeff = get_coeff(mclk_hz, sample_hz).ok_or(Error::NotSupported)?;
-
-        // Register 0x02: pre_div and pre_multi
-        let mut reg02 = self.read_reg(i2c, CLK_MANAGER_REG02)?;
-        reg02 &= 0x07;
-        reg02 |= ((coeff.pre_div - 1) as u8) << 5;
-        reg02 |= (coeff.pre_multi as u8) << 3;
-        self.write_reg(i2c, CLK_MANAGER_REG02, reg02)?;
-
-        // Register 0x03: fs_mode and adc_osr
-        let reg03 = ((coeff.fs_mode as u8) << 6) | coeff.adc_osr;
-        self.write_reg(i2c, CLK_MANAGER_REG03, reg03)?;
-
-        // Register 0x04: dac_osr
-        self.write_reg(i2c, CLK_MANAGER_REG04, coeff.dac_osr)?;
-
-        // Register 0x05: adc_div and dac_div
-        let reg05 = ((coeff.adc_div - 1) as u8) << 4 | ((coeff.dac_div - 1) as u8);
-        self.write_reg(i2c, CLK_MANAGER_REG05, reg05)?;
-
-        // Register 0x06: bclk_div
-        let mut reg06 = self.read_reg(i2c, CLK_MANAGER_REG06)?;
-        reg06 &= 0xE0;
-        if coeff.bclk_div < 19 {
-            reg06 |= (coeff.bclk_div - 1) as u8;
-        } else {
-            reg06 |= coeff.bclk_div as u8;
+    fn set_bits_per_sample(&mut self, config: &Config) -> Result<(), Error<E>> {
+        let mut dac_iface = self.read_reg(Register::SdpInReg09)?;
+        let mut adc_iface = self.read_reg(Register::SdpOutReg0A)?;
+        match config.bits_per_sample {
+            Resolution::Resolution24 => {
+                dac_iface &= !0x1C;
+                adc_iface &= !0x1C;
+            }
+            Resolution::Resolution32 => {
+                dac_iface |= 0x10;
+                adc_iface |= 0x10;
+            }
+            _ => {
+                dac_iface |= 0x0C;
+                adc_iface |= 0x0C;
+            }
         }
-        self.write_reg(i2c, CLK_MANAGER_REG06, reg06)?;
-
-        // Register 0x07: lrck_h
-        let mut reg07 = self.read_reg(i2c, CLK_MANAGER_REG07)?;
-        reg07 &= 0xC0;
-        reg07 |= coeff.lrck_h as u8;
-        self.write_reg(i2c, CLK_MANAGER_REG07, reg07)?;
-
-        // Register 0x08: lrck_l
-        self.write_reg(i2c, CLK_MANAGER_REG08, coeff.lrck_l)?;
-
+        self.write_reg(Register::SdpInReg09, dac_iface)?;
+        self.write_reg(Register::SdpOutReg0A, adc_iface)?;
         Ok(())
     }
 
-    /// Configure the audio serial data port format (I2S, resolution, ...).
-    fn fmt_config<I2C, E>(
-        &self,
-        i2c: &mut I2C,
-        res_in: Resolution,
-        res_out: Resolution,
-    ) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        // Force slave mode (default)
-        let reg00 = self.read_reg(i2c, RESET_REG00)? & 0xBF;
-        self.write_reg(i2c, RESET_REG00, reg00)?;
-
-        let mut reg09 = 0; // SDP In
-        let mut reg0a = 0; // SDP Out
-
-        // Set SDP In resolution
-        reg09 |= match res_in {
-            Resolution::Bits16 => 3 << 2,
-            Resolution::Bits18 => 2 << 2,
-            Resolution::Bits20 => 1 << 2,
-            Resolution::Bits24 => 0 << 2,
-            Resolution::Bits32 => 4 << 2,
-        };
-        // Set SDP Out resolution
-        reg0a |= match res_out {
-            Resolution::Bits16 => 3 << 2,
-            Resolution::Bits18 => 2 << 2,
-            Resolution::Bits20 => 1 << 2,
-            Resolution::Bits24 => 0 << 2,
-            Resolution::Bits32 => 4 << 2,
-        };
-
-        self.write_reg(i2c, SDPIN_REG09, reg09)?;
-        self.write_reg(i2c, SDPOUT_REG0A, reg0a)?;
-
+    fn config_fmt(&mut self, _config: &Config) -> Result<(), Error<E>> {
+        let mut dac_iface = self.read_reg(Register::SdpInReg09)?;
+        let mut adc_iface = self.read_reg(Register::SdpOutReg0A)?;
+        dac_iface &= 0xFC;
+        adc_iface &= 0xFC;
+        self.write_reg(Register::SdpInReg09, dac_iface)?;
+        self.write_reg(Register::SdpOutReg0A, adc_iface)?;
         Ok(())
     }
 
-    /// Configure microphone (analog or digital).
-    pub fn microphone_config<I2C, E>(
-        &self,
-        i2c: &mut I2C,
-        digital_mic: bool,
-    ) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let mut reg14 = 0x1A; // enable analog MIC and max PGA gain
+    fn config_sample(&mut self, config: &Config) -> Result<(), Error<E>> {
+        let mclk_fre = match config.mclk {
+            None => MclkFreq::try_from_freq(config.sample_frequency.as_freq() * 256)
+                .ok_or(Error::InvalidConfiguration)?,
+            Some(mclk) => mclk,
+        };
+        let coefficients = Coefficients::get(mclk_fre, config.sample_frequency)
+            .ok_or(Error::InvalidConfiguration)?;
+        let mut regv = self.read_reg(Register::ClkManagerReg02)?;
+        regv &= 0x7;
+        regv |= (coefficients.pre_div - 1) << 5;
+        let datmp = match &coefficients.pre_multi {
+            &1 => 0,
+            &2 => 1,
+            &4 => 2,
+            &8 => 3,
+            _ => 0,
+        };
+        regv |= datmp << 3;
+        self.write_reg(Register::ClkManagerReg02, regv)?;
+
+        let mut regv = 0x00;
+        regv |= (coefficients.adc_div - 1) << 4;
+        regv |= (coefficients.dac_div - 1) << 4;
+        self.write_reg(Register::ClkManagerReg05, regv)?;
+
+        let mut regv = self.read_reg(Register::ClkManagerReg03)?;
+        regv &= 0x80;
+        regv |= coefficients.fs_mode << 6;
+        regv |= coefficients.adc_osr << 0;
+        self.write_reg(Register::ClkManagerReg03, regv)?;
+
+        let mut regv = self.read_reg(Register::ClkManagerReg04)?;
+        regv &= 0x80;
+        regv |= coefficients.dac_osr << 0;
+        self.write_reg(Register::ClkManagerReg04, regv)?;
+
+        let mut regv = self.read_reg(Register::ClkManagerReg07)?;
+        regv &= 0xC0;
+        regv |= coefficients.lrck_h << 0;
+        self.write_reg(Register::ClkManagerReg07, regv)?;
+
+        let mut regv = self.read_reg(Register::ClkManagerReg08)?;
+        regv &= 0x00;
+        regv |= coefficients.lrck_l << 0;
+        self.write_reg(Register::ClkManagerReg08, regv)?;
+
+        let mut regv = self.read_reg(Register::ClkManagerReg06)?;
+        regv &= 0xE0;
+        if coefficients.bclk_div < 19 {
+            regv |= (coefficients.bclk_div - 1) << 0;
+        } else {
+            regv |= coefficients.bclk_div << 0;
+        }
+        self.write_reg(Register::ClkManagerReg06, regv)?;
+        Ok(())
+    }
+
+    fn start(&mut self) -> Result<(), Error<E>> {
+        let mut regv = 0x80;
+        regv &= 0xBF;
+        self.write_reg(Register::ResetReg00, regv)?;
+        regv = 0x3F;
+        regv &= 0x7F;
+        regv &= !(0x40);
+        self.write_reg(Register::ClkManagerReg01, regv)?;
+
+        let mut dac_iface = self.read_reg(Register::SdpInReg09)?;
+        let mut adc_iface = self.read_reg(Register::SdpOutReg0A)?;
+        dac_iface &= 0xBF;
+        adc_iface &= 0xBF;
+        dac_iface &= !(1 << 6);
+        adc_iface &= !(1 << 6);
+        self.write_reg(Register::SdpInReg09, dac_iface)?;
+        self.write_reg(Register::SdpOutReg0A, adc_iface)?;
+
+        self.write_reg(Register::AdcReg17, 0xBF)?;
+        self.write_reg(Register::SystemReg0E, 0x02)?;
+        self.write_reg(Register::SystemReg12, 0x00)?;
+        self.write_reg(Register::SystemReg14, 0x1A)?;
+
+        let mut regv = self.read_reg(Register::SystemReg14)?;
+        regv &= !0x40;
+        self.write_reg(Register::SystemReg14, regv)?;
+        self.write_reg(Register::SystemReg0D, 0x01)?;
+        self.write_reg(Register::AdcReg15, 0x40)?;
+        self.write_reg(Register::DacReg37, 0x08)?;
+        self.write_reg(Register::GpReg45, 0x00)?;
+        Ok(())
+    }
+
+    pub fn mic_config(&mut self, digital_mic: bool) -> Result<(), Error<E>> {
+        let mut reg14 = 0x1A;
         if digital_mic {
-            reg14 |= 0x40; // bit 6
+            reg14 |= 1 << 6;
         }
-        self.write_reg(i2c, ADC_REG17, 0xC8)?; // Set ADC gain
-        self.write_reg(i2c, SYSTEM_REG14, reg14)
+
+        self.write_reg(Register::AdcReg17, 0xC8)?;
+        self.write_reg(Register::SystemReg14, reg14)
     }
 
-    /// Set microphone gain.
-    pub fn microphone_gain_set<I2C, E>(&self, i2c: &mut I2C, gain: MicGain) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let val = match gain {
-            MicGain::Min => 0x00,
-            MicGain::Gain0dB => 0x08,
-            MicGain::Gain6dB => 0x10,
-            MicGain::Gain12dB => 0x18,
-            MicGain::Gain18dB => 0x20,
-            MicGain::Gain24dB => 0x28,
-            MicGain::Gain30dB => 0x30,
-            MicGain::Gain36dB => 0x38,
-            MicGain::Gain42dB => 0x3F,
-            MicGain::Max => 0x3F,
-        };
-        self.write_reg(i2c, ADC_REG16, val)
+    pub fn set_voice_volume(&mut self, volume: u8) -> Result<(), Error<E>> {
+        self.write_reg(Register::DacReg32, volume)
     }
 
-    /// Set output volume (0 to 100). Returns the actual volume set.
-    pub fn volume_set<I2C, E>(
-        &self,
-        i2c: &mut I2C,
-        volume: u8,
-        volume_set: Option<&mut u8>,
-    ) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let volume = volume.min(100);
-        let reg32 = if volume == 0 {
-            0
-        } else {
-            ((volume as u32 * 256 / 100) - 1) as u8
-        };
-        if let Some(v) = volume_set {
-            *v = volume;
-        }
-        self.write_reg(i2c, DAC_REG32, reg32)
+    pub fn voice_volume(&mut self) -> Result<u8, Error<E>> {
+        self.read_reg(Register::DacReg32)
     }
 
-    /// Get current output volume (0 to 100).
-    pub fn volume_get<I2C, E>(&self, i2c: &mut I2C) -> Result<u8, Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let reg32 = self.read_reg(i2c, DAC_REG32)?;
-        Ok(if reg32 == 0 {
-            0
-        } else {
-            ((reg32 as u32 * 100 / 256) + 1) as u8
-        })
-    }
-
-    /// Mute or unmute the output.
-    pub fn mute<I2C, E>(&self, i2c: &mut I2C, mute: bool) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let mut reg31 = self.read_reg(i2c, DAC_REG31)?;
+    pub fn voice_mute(&mut self, mute: bool) -> Result<(), Error<E>> {
+        let mut reg31 = self.read_reg(Register::DacReg31)?;
+        const MUTE: u8 = (1 << 6) | (1 << 5);
         if mute {
-            reg31 |= 0x60; // bits 6 and 5
+            reg31 |= MUTE;
         } else {
-            reg31 &= !0x60;
+            reg31 &= !MUTE;
         }
-        self.write_reg(i2c, DAC_REG31, reg31)
+        self.write_reg(Register::DacReg31, reg31)
     }
 
-    /// Set fade rate for DAC
-    pub fn fade<I2C, E>(&self, i2c: &mut I2C, fade: Fade) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let mut reg37 = self.read_reg(i2c, DAC_REG37)?;
-        reg37 &= 0x0F;
-        reg37 |= (fade as u8) << 4;
-        self.write_reg(i2c, DAC_REG37, reg37)
+    pub fn set_mic_gain(&mut self, gain: Gain) -> Result<(), Error<E>> {
+        self.write_reg(Register::AdcReg16, gain as u8)
     }
 
-    /// Set fade rate for microphone (ADC).
-    pub fn microphone_fade<I2C, E>(&self, i2c: &mut I2C, fade: Fade) -> Result<(), Error<E>>
-    where
-        I2C: I2c<Error = E>,
-    {
-        let mut reg15 = self.read_reg(i2c, ADC_REG15)?;
-        reg15 &= 0x0F;
-        reg15 |= (fade as u8) << 4;
-        self.write_reg(i2c, ADC_REG15, reg15)
+    pub fn set_mic_fade(&mut self, fade: Fade) -> Result<(), Error<E>> {
+        self.set_fade(Register::AdcReg16, fade)
     }
-}
 
-// Clock coefficient table (unchanged)
-#[derive(Clone, Copy)]
-struct CoeffDiv {
-    mclk: u32,
-    rate: u32,
-    pre_div: u8,
-    pre_multi: u8,
-    adc_div: u8,
-    dac_div: u8,
-    fs_mode: u8,
-    lrck_h: u8,
-    lrck_l: u8,
-    bclk_div: u8,
-    adc_osr: u8,
-    dac_osr: u8,
-}
+    pub fn set_voice_fade(&mut self, fade: Fade) -> Result<(), Error<E>> {
+        self.set_fade(Register::DacReg37, fade)
+    }
 
-const COEFF_TABLE: &[CoeffDiv] = &[
-    // 8k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 8000,
-        pre_div: 0x06,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 18432000,
-        rate: 8000,
-        pre_div: 0x03,
-        pre_multi: 0x01,
-        adc_div: 0x03,
-        dac_div: 0x03,
-        fs_mode: 0x00,
-        lrck_h: 0x05,
-        lrck_l: 0xff,
-        bclk_div: 0x18,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 16384000,
-        rate: 8000,
-        pre_div: 0x08,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 8192000,
-        rate: 8000,
-        pre_div: 0x04,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 8000,
-        pre_div: 0x03,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 4096000,
-        rate: 8000,
-        pre_div: 0x02,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 8000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2048000,
-        rate: 8000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 8000,
-        pre_div: 0x03,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1024000,
-        rate: 8000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 11.025k
-    CoeffDiv {
-        mclk: 11289600,
-        rate: 11025,
-        pre_div: 0x04,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 5644800,
-        rate: 11025,
-        pre_div: 0x02,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2822400,
-        rate: 11025,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1411200,
-        rate: 11025,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 12k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 12000,
-        pre_div: 0x04,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 12000,
-        pre_div: 0x02,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 12000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 12000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 16k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 16000,
-        pre_div: 0x03,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 18432000,
-        rate: 16000,
-        pre_div: 0x03,
-        pre_multi: 0x01,
-        adc_div: 0x03,
-        dac_div: 0x03,
-        fs_mode: 0x00,
-        lrck_h: 0x02,
-        lrck_l: 0xff,
-        bclk_div: 0x0c,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 16384000,
-        rate: 16000,
-        pre_div: 0x04,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 8192000,
-        rate: 16000,
-        pre_div: 0x02,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 16000,
-        pre_div: 0x03,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 4096000,
-        rate: 16000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 16000,
-        pre_div: 0x03,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2048000,
-        rate: 16000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 16000,
-        pre_div: 0x03,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1024000,
-        rate: 16000,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 22.05k
-    CoeffDiv {
-        mclk: 11289600,
-        rate: 22050,
-        pre_div: 0x02,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 5644800,
-        rate: 22050,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2822400,
-        rate: 22050,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1411200,
-        rate: 22050,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 705600,
-        rate: 22050,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 24k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 24000,
-        pre_div: 0x02,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 18432000,
-        rate: 24000,
-        pre_div: 0x03,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 24000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 24000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 24000,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 32k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 32000,
-        pre_div: 0x03,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 18432000,
-        rate: 32000,
-        pre_div: 0x03,
-        pre_multi: 0x02,
-        adc_div: 0x03,
-        dac_div: 0x03,
-        fs_mode: 0x00,
-        lrck_h: 0x02,
-        lrck_l: 0xff,
-        bclk_div: 0x0c,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 16384000,
-        rate: 32000,
-        pre_div: 0x02,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 8192000,
-        rate: 32000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 32000,
-        pre_div: 0x03,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 4096000,
-        rate: 32000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 32000,
-        pre_div: 0x03,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2048000,
-        rate: 32000,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 32000,
-        pre_div: 0x03,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x01,
-        lrck_h: 0x00,
-        lrck_l: 0x7f,
-        bclk_div: 0x02,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1024000,
-        rate: 32000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 44.1k
-    CoeffDiv {
-        mclk: 11289600,
-        rate: 44100,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 5644800,
-        rate: 44100,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2822400,
-        rate: 44100,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1411200,
-        rate: 44100,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 48k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 48000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 18432000,
-        rate: 48000,
-        pre_div: 0x03,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 48000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 48000,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 48000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 64k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 64000,
-        pre_div: 0x03,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 18432000,
-        rate: 64000,
-        pre_div: 0x03,
-        pre_multi: 0x02,
-        adc_div: 0x03,
-        dac_div: 0x03,
-        fs_mode: 0x01,
-        lrck_h: 0x01,
-        lrck_l: 0x7f,
-        bclk_div: 0x06,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 16384000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x00,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 8192000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x03,
-        dac_div: 0x03,
-        fs_mode: 0x01,
-        lrck_h: 0x01,
-        lrck_l: 0x7f,
-        bclk_div: 0x06,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 4096000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x03,
-        dac_div: 0x03,
-        fs_mode: 0x01,
-        lrck_h: 0x01,
-        lrck_l: 0x7f,
-        bclk_div: 0x06,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2048000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x01,
-        lrck_h: 0x00,
-        lrck_l: 0xbf,
-        bclk_div: 0x03,
-        adc_osr: 0x18,
-        dac_osr: 0x18,
-    },
-    CoeffDiv {
-        mclk: 1024000,
-        rate: 64000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x01,
-        lrck_h: 0x00,
-        lrck_l: 0x7f,
-        bclk_div: 0x02,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 88.2k
-    CoeffDiv {
-        mclk: 11289600,
-        rate: 88200,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 5644800,
-        rate: 88200,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 2822400,
-        rate: 88200,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1411200,
-        rate: 88200,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x01,
-        lrck_h: 0x00,
-        lrck_l: 0x7f,
-        bclk_div: 0x02,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    // 96k
-    CoeffDiv {
-        mclk: 12288000,
-        rate: 96000,
-        pre_div: 0x01,
-        pre_multi: 0x01,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 18432000,
-        rate: 96000,
-        pre_div: 0x03,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 6144000,
-        rate: 96000,
-        pre_div: 0x01,
-        pre_multi: 0x02,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 3072000,
-        rate: 96000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x00,
-        lrck_h: 0x00,
-        lrck_l: 0xff,
-        bclk_div: 0x04,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-    CoeffDiv {
-        mclk: 1536000,
-        rate: 96000,
-        pre_div: 0x01,
-        pre_multi: 0x03,
-        adc_div: 0x01,
-        dac_div: 0x01,
-        fs_mode: 0x01,
-        lrck_h: 0x00,
-        lrck_l: 0x7f,
-        bclk_div: 0x02,
-        adc_osr: 0x10,
-        dac_osr: 0x10,
-    },
-];
+    fn set_fade(&mut self, register: Register, fade: Fade) -> Result<(), Error<E>> {
+        let mut reg = self.read_reg(register)?;
+        reg &= 0x0F;
+        reg |= (fade as u8) << 4;
+        self.write_reg(register, reg)
+    }
 
-/// Look up the coefficient for a given MCLK and sample rate.
-fn get_coeff(mclk: u32, rate: u32) -> Option<&'static CoeffDiv> {
-    COEFF_TABLE
-        .iter()
-        .find(|c| c.mclk == mclk && c.rate == rate)
+    pub fn dump_regs(&mut self) -> Result<(), Error<E>> {
+        use strum::IntoEnumIterator;
+        for register in Register::iter() {
+            let reg_val = register as u8;
+            let val = self.read_reg(register)?;
+            info!("register {register:?} at address {reg_val:#02X} with value {val:#02X}")
+        }
+        Ok(())
+    }
+
+    fn read_reg(&mut self, reg: Register) -> Result<u8, Error<E>> {
+        use core::array::from_mut;
+        let mut value = 0;
+        self.i2c
+            .write_read(self.address as u8, &[reg as u8], from_mut(&mut value))
+            .map_err(Error::BusError)?;
+        Ok(value)
+    }
+
+    fn write_reg(&mut self, reg: Register, value: u8) -> Result<(), Error<E>> {
+        self.i2c
+            .write(self.address as u8, &[reg as u8, value])
+            .map_err(Error::BusError)
+    }
 }

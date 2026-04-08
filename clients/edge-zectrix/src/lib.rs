@@ -59,6 +59,8 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         use esp_hal::gpio::{Level, Output, OutputConfig};
         let _pwr = Output::new(peripherals.GPIO17, Level::High, OutputConfig::default());
         let _epd_pwr = Output::new(peripherals.GPIO6, Level::High, OutputConfig::default());
+        let _pa = Output::new(peripherals.GPIO46, Level::High, OutputConfig::default());
+        let _amp_pwr = Output::new(peripherals.GPIO42, Level::High, OutputConfig::default());
     }
 
     let i2c = Box::leak(Box::new_in(
@@ -85,12 +87,14 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         peripherals.GPIO13,
     ))?;
 
+    #[cfg(feature = "ssd2683")]
     spawner.spawn(button_task(
         peripherals.GPIO0,
         peripherals.GPIO39,
         peripherals.GPIO18,
     ))?;
 
+    #[cfg(feature = "ssd2683")]
     spawner.spawn(audio_task(
         peripherals.I2S0,
         peripherals.DMA_CH1,
@@ -99,7 +103,6 @@ pub async fn init(spawner: Spawner) -> Result<()> {
         peripherals.GPIO15,
         peripherals.GPIO16,
         peripherals.GPIO45,
-        peripherals.GPIO46,
         RefCellDevice::new(i2c),
     ))?;
 
