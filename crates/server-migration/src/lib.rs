@@ -10,9 +10,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20260306_121657_html_pages::Migration),
             Box::new(m20260309_104447_user::Migration),
             Box::new(m20260330_000001_module_config::Migration),
+            Box::new(m20260408_000001_message_pool::Migration),
         ]
     }
 }
 mod m20260306_121657_html_pages;
 mod m20260309_104447_user;
 mod m20260330_000001_module_config;
+mod m20260408_000001_message_pool;

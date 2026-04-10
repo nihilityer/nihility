@@ -9,7 +9,7 @@ sea-orm-cli migrate generate -d crates/server-migration/ NAME_OF_MIGRATION
 ## 根据数据库表生成`entity`文件
 
 ```bash
-sea-orm-cli generate entity -o crates/server-entity/src/ -l
+sea-orm-cli generate entity -o crates/server-entity/src/ -l --entity-format dense
 ```
 
 ### 其他参数参考

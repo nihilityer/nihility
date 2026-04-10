@@ -4,13 +4,19 @@ use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "user")]
+#[sea_orm(table_name = "scene")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
     #[sea_orm(unique)]
     pub name: String,
-    pub password: String,
+    pub parent_id: Option<Uuid>,
+    #[sea_orm(column_type = "JsonBinary")]
+    pub metadata: Json,
+    pub created_at: DateTimeWithTimeZone,
+    pub updated_at: DateTimeWithTimeZone,
+    #[sea_orm(has_many)]
+    pub messages: HasMany<super::message::Entity>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}
