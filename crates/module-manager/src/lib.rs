@@ -22,6 +22,7 @@ pub enum EmbedModule {
     BrowserControl,
     EdgeDeviceControl,
     Model,
+    MessagePool,
 }
 
 /// 模块功能列表
@@ -105,6 +106,18 @@ impl ModuleManager {
                         }
                         let module = Arc::new(RwLock::new(module));
                         edge_device_control = Some(module.clone());
+                        modules.insert(ModuleType::Embed(embed_module), module);
+                    }
+                    EmbedModule::MessagePool => {
+                        let config =
+                            nihility_config::get_config_with_db::<
+                                nihility_module_message_pool::MessagePoolConfig,
+                            >("nihility-module-message-pool", &conn)
+                            .await?;
+                        let module = Arc::new(RwLock::new(
+                            nihility_module_message_pool::MessagePool::init(config, conn.clone())
+                                .await?,
+                        ));
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                 },
@@ -234,6 +247,7 @@ impl Default for ModuleManagerConfig {
         Self {
             enable_modules: vec![
                 ModuleType::Embed(EmbedModule::BrowserControl),
+                ModuleType::Embed(EmbedModule::MessagePool),
                 ModuleType::Embed(EmbedModule::EdgeDeviceControl),
                 ModuleType::Embed(EmbedModule::Model),
             ],
@@ -255,6 +269,7 @@ impl ModuleManagerConfig {
 
         embeds.sort_by_key(|embed| match embed {
             EmbedModule::BrowserControl => 0,
+            EmbedModule::MessagePool => 1,
             EmbedModule::Model => 2,
             EmbedModule::EdgeDeviceControl => 3,
         });
@@ -276,6 +291,7 @@ impl Serialize for EmbedModule {
             EmbedModule::BrowserControl => "browser-control",
             EmbedModule::EdgeDeviceControl => "edge-device-control",
             EmbedModule::Model => "model",
+            EmbedModule::MessagePool => "message-pool",
         };
         serializer.serialize_str(s)
     }
@@ -291,6 +307,7 @@ impl<'de> Deserialize<'de> for EmbedModule {
             "browser-control" => Ok(EmbedModule::BrowserControl),
             "edge-device-control" => Ok(EmbedModule::EdgeDeviceControl),
             "model" => Ok(EmbedModule::Model),
+            "message-pool" => Ok(EmbedModule::MessagePool),
             _ => Err(serde::de::Error::custom(format!(
                 "unknown embed module: {}",
                 s
@@ -310,6 +327,7 @@ impl Serialize for ModuleType {
                     EmbedModule::BrowserControl => "browser-control",
                     EmbedModule::EdgeDeviceControl => "edge-device-control",
                     EmbedModule::Model => "model",
+                    EmbedModule::MessagePool => "message-pool",
                 };
                 format!("embed-{}", embed_str)
             }
@@ -331,6 +349,7 @@ impl<'de> Deserialize<'de> for ModuleType {
                 "browser-control" => Ok(ModuleType::Embed(EmbedModule::BrowserControl)),
                 "edge-device-control" => Ok(ModuleType::Embed(EmbedModule::EdgeDeviceControl)),
                 "model" => Ok(ModuleType::Embed(EmbedModule::Model)),
+                "message-pool" => Ok(ModuleType::Embed(EmbedModule::MessagePool)),
                 _ => Err(serde::de::Error::custom(format!(
                     "unknown embed module: {}",
                     embed_name
