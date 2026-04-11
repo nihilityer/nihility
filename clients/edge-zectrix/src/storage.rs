@@ -1,4 +1,4 @@
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use anyhow::{anyhow, Result};
 use core::cell::Cell;
@@ -155,7 +155,7 @@ pub fn load_config() -> Result<Option<DeviceConfig>> {
 
     // 反序列化
     match from_bytes::<DeviceConfig>(&buffer[..data_len]) {
-        Ok(mut config) => {
+        Ok(config) => {
             info!(
                 "Loaded config from flash: SSID={}, Server={}:{}",
                 config.wifi.ssid, config.server.host, config.server.port
@@ -169,14 +169,12 @@ pub fn load_config() -> Result<Option<DeviceConfig>> {
     }
 }
 
-/// 清空保存的 WiFi 凭证
 pub fn clear_credentials() -> Result<()> {
     critical_section::with(|cs| {
         let mut flash_storage = STORAGE
             .borrow(cs)
             .replace(None)
             .expect("flash storage not init");
-        // 擦除 Flash 扇区
         flash_storage
             .erase(CREDENTIALS_OFFSET, CREDENTIALS_OFFSET + ERASE_SIZE)
             .expect("Failed to erase credentials");

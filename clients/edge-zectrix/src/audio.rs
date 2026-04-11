@@ -7,13 +7,12 @@ use crate::TO_SERVER_CHANNEL;
 use alloc::vec::Vec;
 use embassy_time::{Duration, Timer};
 use embedded_hal_bus::i2c::RefCellDevice;
-use esp_hal::delay::Delay;
 use esp_hal::i2c::master::I2c;
-use esp_hal::i2s::master::{Channels, DataFormat, Error, I2s, I2sRx};
+use esp_hal::i2s::master::{Channels, DataFormat, I2s, I2sRx};
 use esp_hal::peripherals::{DMA_CH1, GPIO14, GPIO15, GPIO16, GPIO38, GPIO45, I2S0};
 use esp_hal::time::Rate;
 use esp_hal::{dma_buffers, Async, Blocking};
-use log::{error, info};
+use log::{error, info, warn};
 use nihility_edge_protocol::{AudioData, Message};
 
 const CHUNK_SIZE: usize = 512 * 16;
@@ -91,11 +90,11 @@ async fn record(rx_buffer: &'static mut [u8; 16368], i2s_rx: I2sRx<'static, Asyn
                 );
 
                 while accum_buffer.len() >= CHUNK_SIZE {
-                    sender
-                        .send(Message::AudioData(AudioData {
-                            audio_data: accum_buffer[..CHUNK_SIZE].to_vec(),
-                        }))
-                        .await;
+                    if let Err(e) = sender.try_send(Message::AudioData(AudioData {
+                        audio_data: accum_buffer[..CHUNK_SIZE].to_vec(),
+                    })) {
+                        warn!("Failed to send audio data: {:?}", e);
+                    }
 
                     if accum_buffer.len() > CHUNK_SIZE {
                         let remaining = accum_buffer[CHUNK_SIZE..].to_vec();

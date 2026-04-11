@@ -57,6 +57,7 @@ pub enum MclkFreq {
     Freq18Mhz,
 }
 
+#[allow(dead_code)]
 impl MclkFreq {
     pub const fn as_freq(self) -> u32 {
         use MclkFreq::*;
@@ -102,6 +103,7 @@ impl MclkFreq {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum Gain {
     GainMin = -1,
@@ -116,6 +118,7 @@ pub enum Gain {
     GainMax,
 }
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum Fade {
     FadeOff = 0,
@@ -136,6 +139,7 @@ pub enum Fade {
     Fade65536LRCK,
 }
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Resolution {
     Resolution16 = 3,
@@ -145,6 +149,7 @@ pub enum Resolution {
     Resolution32 = 4,
 }
 
+#[allow(dead_code)]
 impl Resolution {
     pub(crate) const fn bits(self) -> u8 {
         use Resolution::*;
@@ -171,6 +176,7 @@ pub struct Config {
 }
 
 /// I²C slave addresses, determined by the logic level of pin `CE`
+#[allow(dead_code)]
 #[derive(Copy, Clone)]
 pub enum Address {
     /// `CE` pin == 0

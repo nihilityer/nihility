@@ -1,8 +1,5 @@
 pub use config::*;
-use embedded_hal::{
-    delay::DelayNs,
-    i2c::{Error as I2cError, I2c},
-};
+use embedded_hal::i2c::{Error as I2cError, I2c};
 pub use error::Error;
 use log::info;
 use register::Register;
@@ -16,6 +13,7 @@ pub struct Es8311<I2C> {
     address: Address,
 }
 
+#[allow(dead_code)]
 impl<I2C: I2c<Error = E>, E: I2cError> Es8311<I2C> {
     pub fn new(i2c: I2C, address: Address) -> Self {
         Self { i2c, address }
