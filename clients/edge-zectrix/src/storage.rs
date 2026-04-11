@@ -160,7 +160,6 @@ pub fn load_config() -> Result<Option<DeviceConfig>> {
                 "Loaded config from flash: SSID={}, Server={}:{}",
                 config.wifi.ssid, config.server.host, config.server.port
             );
-            config.server.host = "192.168.7.109".to_string();
             Ok(Some(config))
         }
         Err(e) => {

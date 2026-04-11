@@ -24,6 +24,7 @@ impl<I2C: I2c<Error = E>, E: I2cError> Es8311<I2C> {
     pub fn init(&mut self, config: &Config) -> Result<(), Error<E>> {
         let regv = self.read_reg(Register::SystemReg0D)?;
         if regv != 0xFA {
+            info!("SystemReg0D: {}", regv);
             self.write_reg(Register::SystemReg0D, 0xFA)?;
         }
         self.write_reg(Register::GpioReg44, 0x08)?;
@@ -49,7 +50,7 @@ impl<I2C: I2c<Error = E>, E: I2cError> Es8311<I2C> {
         self.write_reg(Register::SystemReg13, 0x10)?;
         self.write_reg(Register::AdcReg1B, 0x0A)?;
         self.write_reg(Register::AdcReg1C, 0x6A)?;
-        self.write_reg(Register::GpioReg44, 0x08)?;
+        self.write_reg(Register::GpioReg44, 0x58)?;
 
         self.set_bits_per_sample(config)?;
         self.config_fmt(config)?;
@@ -138,7 +139,7 @@ impl<I2C: I2c<Error = E>, E: I2cError> Es8311<I2C> {
 
         let mut regv = 0x00;
         regv |= (coefficients.adc_div - 1) << 4;
-        regv |= (coefficients.dac_div - 1) << 4;
+        regv |= (coefficients.dac_div - 1) << 0;
         self.write_reg(Register::ClkManagerReg05, regv)?;
 
         let mut regv = self.read_reg(Register::ClkManagerReg03)?;
@@ -157,8 +158,7 @@ impl<I2C: I2c<Error = E>, E: I2cError> Es8311<I2C> {
         regv |= coefficients.lrck_h << 0;
         self.write_reg(Register::ClkManagerReg07, regv)?;
 
-        let mut regv = self.read_reg(Register::ClkManagerReg08)?;
-        regv &= 0x00;
+        let mut regv = 0x00;
         regv |= coefficients.lrck_l << 0;
         self.write_reg(Register::ClkManagerReg08, regv)?;
 
@@ -204,16 +204,6 @@ impl<I2C: I2c<Error = E>, E: I2cError> Es8311<I2C> {
         self.write_reg(Register::DacReg37, 0x08)?;
         self.write_reg(Register::GpReg45, 0x00)?;
         Ok(())
-    }
-
-    pub fn mic_config(&mut self, digital_mic: bool) -> Result<(), Error<E>> {
-        let mut reg14 = 0x1A;
-        if digital_mic {
-            reg14 |= 1 << 6;
-        }
-
-        self.write_reg(Register::AdcReg17, 0xC8)?;
-        self.write_reg(Register::SystemReg14, reg14)
     }
 
     pub fn set_voice_volume(&mut self, volume: u8) -> Result<(), Error<E>> {

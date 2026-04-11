@@ -38,9 +38,8 @@ pub async fn audio_task(
         sclk_inverted: false,
     };
     codec.init(&config).expect("init es8311 failed");
-    codec.mic_config(true).expect("microphone config failed");
     codec
-        .set_mic_gain(Gain::Gain24db)
+        .set_mic_gain(Gain::Gain36db)
         .expect("microphone gain set failed");
     Timer::after(Duration::from_secs(1)).await;
 
@@ -50,7 +49,7 @@ pub async fn audio_task(
         esp_hal::i2s::master::Config::new_tdm_philips()
             .with_sample_rate(Rate::from_hz(16000))
             .with_data_format(DataFormat::Data16Channel16)
-            .with_channels(Channels::MONO),
+            .with_channels(Channels::LEFT),
     )
     .expect("Failed to initialize I2S")
     .with_mclk(mclk)
@@ -81,12 +80,11 @@ async fn record(rx_buffer: &'static mut [u8; 16368], i2s_rx: I2sRx<'static, Asyn
         match transfer.pop(&mut i2s_buffer).await {
             Ok(len) => {
                 if debug_output {
-                    info!("len: {}, i2s_buffer: {:?}", len, &i2s_buffer[..128]);
                     debug_output = false;
                 }
                 accum_buffer.extend_from_slice(
                     &i2s_buffer[..len]
-                        .chunks_exact(4)
+                        .chunks_exact(2)
                         .map(|c| i16::from_le_bytes([c[0], c[1]]))
                         .map(|x| x as f32 / i16::MAX as f32)
                         .collect::<Vec<f32>>(),
