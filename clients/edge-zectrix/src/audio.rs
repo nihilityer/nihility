@@ -15,7 +15,7 @@ use esp_hal::{dma_buffers, Async, Blocking};
 use log::{error, info, warn};
 use nihility_edge_protocol::{AudioData, Message};
 
-const CHUNK_SIZE: usize = 512 * 16;
+const CHUNK_SIZE: usize = 512 * 32;
 
 #[embassy_executor::task]
 pub async fn audio_task(
@@ -53,7 +53,7 @@ pub async fn audio_task(
     .expect("Failed to initialize I2S")
     .with_mclk(mclk)
     .into_async();
-    let (rx_buffer, rx_descriptors, _, _tx_descriptors) = dma_buffers!(4 * 4092);
+    let (rx_buffer, rx_descriptors, _, _tx_descriptors) = dma_buffers!(8 * 4092);
 
     let i2s_rx = i2s
         .i2s_rx
@@ -65,10 +65,10 @@ pub async fn audio_task(
     record(rx_buffer, i2s_rx).await;
 }
 
-async fn record(rx_buffer: &'static mut [u8; 16368], i2s_rx: I2sRx<'static, Async>) {
+async fn record(rx_buffer: &'static mut [u8; 32736], i2s_rx: I2sRx<'static, Async>) {
     Timer::after(Duration::from_secs(5)).await;
     info!("Recording");
-    let mut i2s_buffer = [0u8; 4092 * 2];
+    let mut i2s_buffer = [0u8; 4092 * 8];
     let mut accum_buffer = Vec::with_capacity_in(CHUNK_SIZE, esp_alloc::ExternalMemory);
     let sender = TO_SERVER_CHANNEL.sender();
     let mut transfer = i2s_rx

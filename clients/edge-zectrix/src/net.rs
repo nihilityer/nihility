@@ -5,7 +5,7 @@ use esp_hal::efuse::Efuse;
 
 pub mod wifi;
 
-pub(crate) const MAX_RETRY_COUNT: usize = 30;
+pub const MAX_RETRY_COUNT: usize = 30;
 
 pub fn get_device_id() -> Result<String> {
     let mut buf = [0u8; 8];
