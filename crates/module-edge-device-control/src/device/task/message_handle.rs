@@ -59,8 +59,8 @@ pub(crate) async fn start_message_handle(
                         }
                         Message::AudioData(audio_data) => {
                             for sample in audio_data.audio_data {
-                                if let Err(e) = sample_sender.send(sample) {
-                                    warn!("Failed to send audio to VAD: {}", e);
+                                if sample_sender.send(sample).is_err() {
+                                    warn!("Failed to send audio to audio_handle task");
                                 }
                             }
                         }

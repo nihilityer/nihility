@@ -2,6 +2,7 @@ use crate::device::task::audio_handle::start_audio_handle;
 use crate::device::{start_message_handle, Device};
 use crate::error::*;
 use axum::extract::ws::{Message, WebSocket};
+use nihility_module_model::Model;
 use nihility_util_vad::{start_vad, VoiceActivityDetectionConfig};
 use postcard::from_bytes;
 use std::collections::HashMap;
@@ -11,8 +12,14 @@ use tracing::{debug, error};
 
 pub(crate) async fn register_device(
     mut web_socket: WebSocket,
+    model: Option<Arc<RwLock<Model>>>,
     devices: Arc<RwLock<HashMap<String, Device>>>,
 ) -> Result<()> {
+    if model.is_none() {
+        return Err(EdgeDeviceControlError::DeviceStatus(
+            "Model module not set".to_string(),
+        ));
+    }
     let mut device = None;
     // 接受来自设备的信息后注册新设备
     while let Some(Ok(msg)) = web_socket.recv().await {
@@ -43,7 +50,9 @@ pub(crate) async fn register_device(
             _ => {}
         }
     }
-    if let Some(mut device) = device {
+    if let Some(mut device) = device
+        && let Some(model) = model
+    {
         debug!("register device: {}", device.info.device_id);
         let config = nihility_config::get_config::<VoiceActivityDetectionConfig>(&format!(
             "device_{}_vad",
@@ -52,7 +61,7 @@ pub(crate) async fn register_device(
         let (sample_sender, sample_receiver) = mpsc::unbounded_channel();
         let (speech_receiver, vad_join_handle) = start_vad(config, sample_receiver).await?;
         let audio_handle_task =
-            start_audio_handle(device.info.device_id.clone(), speech_receiver).await?;
+            start_audio_handle(device.info.device_id.clone(), model, speech_receiver).await?;
         device.audio_vad_task = Some(vad_join_handle);
         device.audio_handle_task = Some(audio_handle_task);
 

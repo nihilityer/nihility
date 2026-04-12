@@ -1,7 +1,7 @@
 use crate::config::ModelCapability;
 use crate::error::Result;
 use crate::provider::BoxStream;
-use crate::ModelModule;
+use crate::Model;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +19,7 @@ pub struct TextCompletionStreamParam {
     pub prompt: String,
 }
 
-impl ModelModule {
+impl Model {
     /// 文本补全
     pub async fn text_completion(&self, param: &TextCompletionParam) -> Result<String> {
         self.pool

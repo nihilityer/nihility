@@ -62,6 +62,7 @@ impl ModuleManager {
 
         let mut browser_control = None;
         let mut edge_device_control = None;
+        let mut model = None;
 
         for enable_module in config.enable_modules {
             match enable_module {
@@ -84,8 +85,9 @@ impl ModuleManager {
                         >("nihility-module-model", &conn)
                         .await?;
                         let module = Arc::new(RwLock::new(
-                            nihility_module_model::ModelModule::init(config).await?,
+                            nihility_module_model::Model::init(config).await?,
                         ));
+                        model = Some(module.clone());
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                     EmbedModule::EdgeDeviceControl => {
@@ -101,6 +103,14 @@ impl ModuleManager {
                         } else {
                             error!(
                                 "browser_control module does not exist for module type: {:?}",
+                                embed_module
+                            );
+                        }
+                        if let Some(model) = model.as_ref() {
+                            module.set_model(model.clone()).await?;
+                        } else {
+                            error!(
+                                "model module does not exist for module type: {:?}",
                                 embed_module
                             );
                         }

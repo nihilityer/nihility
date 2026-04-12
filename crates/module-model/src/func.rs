@@ -14,10 +14,10 @@ use crate::func::image_understanding::{ImageUnderstandingParam, ImageUnderstandi
 use crate::func::speech_recognition::SpeechRecognitionParam;
 use crate::func::text_completion::{TextCompletionParam, TextCompletionStreamParam};
 use crate::provider::BoxStream as ProviderBoxStream;
-use crate::ModelModule;
+use crate::Model;
 
 #[async_trait::async_trait]
-impl Callable for ModelModule {
+impl Callable for Model {
     async fn call(&self, func_name: &str, param: Value) -> anyhow::Result<Value> {
         match func_name {
             "text_completion" => {
@@ -50,40 +50,36 @@ impl Callable for ModelModule {
         }
     }
 
-    async fn call_stream(
-        &self,
-        func_name: &str,
-        param: Value,
-    ) -> anyhow::Result<BoxStream<Value>> {
+    async fn call_stream(&self, func_name: &str, param: Value) -> anyhow::Result<BoxStream<Value>> {
         match func_name {
             "text_completion_stream" => {
                 let param = serde_json::from_value::<TextCompletionStreamParam>(param)?;
                 let stream: ProviderBoxStream<String> = self.text_completion_stream(&param).await?;
-                let mapped_stream = stream.map(|r: ModuleResult<String>| {
-                    match r {
-                        Ok(s) => serde_json::to_value(s).map_err(|e| anyhow::anyhow!("{}", e)),
-                        Err(e) => Err(anyhow::anyhow!("{}", e)),
-                    }
+                let mapped_stream = stream.map(|r: ModuleResult<String>| match r {
+                    Ok(s) => serde_json::to_value(s).map_err(|e| anyhow::anyhow!("{}", e)),
+                    Err(e) => Err(anyhow::anyhow!("{}", e)),
                 });
                 Ok(Box::pin(mapped_stream))
             }
             "image_understanding_stream" => {
                 let param = serde_json::from_value::<ImageUnderstandingStreamParam>(param)?;
-                let stream: ProviderBoxStream<String> = self.image_understanding_stream(&param).await?;
-                let mapped_stream = stream.map(|r: ModuleResult<String>| {
-                    match r {
-                        Ok(s) => serde_json::to_value(s).map_err(|e| anyhow::anyhow!("{}", e)),
-                        Err(e) => Err(anyhow::anyhow!("{}", e)),
-                    }
+                let stream: ProviderBoxStream<String> =
+                    self.image_understanding_stream(&param).await?;
+                let mapped_stream = stream.map(|r: ModuleResult<String>| match r {
+                    Ok(s) => serde_json::to_value(s).map_err(|e| anyhow::anyhow!("{}", e)),
+                    Err(e) => Err(anyhow::anyhow!("{}", e)),
                 });
                 Ok(Box::pin(mapped_stream))
             }
-            _ => Err(anyhow::anyhow!("Unsupported streaming func_name: {}", func_name)),
+            _ => Err(anyhow::anyhow!(
+                "Unsupported streaming func_name: {}",
+                func_name
+            )),
         }
     }
 }
 
-impl Module for ModelModule {
+impl Module for Model {
     fn description(&self) -> &str {
         "AI 模型调用模块，支持文本补全、图片理解、语音识别等接口"
     }

@@ -240,14 +240,7 @@ impl Default for SenseVoiceConfig {
 
 #[async_trait]
 impl ModelProvider for SenseVoice {
-    async fn speech_recognition(
-        &self,
-        audio_data: &[f32],
-        sample_rate: u32,
-        channels: u8,
-    ) -> Result<String> {
-        debug_assert_eq!(sample_rate, 16000, "Audio sample rate must be 16000 Hz");
-        debug_assert_eq!(channels, 1, "Audio channels must be 1");
+    async fn speech_recognition(&self, audio_data: &[f32]) -> Result<String> {
         self.infer(audio_data.to_vec()).await
     }
 }

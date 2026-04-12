@@ -181,16 +181,11 @@ impl ModelProvider for OpenAiApiProvider {
         Ok(boxed)
     }
 
-    async fn speech_recognition(
-        &self,
-        audio_data: &[f32],
-        sample_rate: u32,
-        channels: u8,
-    ) -> Result<String> {
+    async fn speech_recognition(&self, audio_data: &[f32]) -> Result<String> {
         // OpenAI expects 16-bit PCM WAV, so convert f32 to 16-bit PCM and create WAV
         let spec = WavSpec {
-            channels: channels as u16,
-            sample_rate,
+            channels: 1,
+            sample_rate: 16000,
             bits_per_sample: 16,
             sample_format: hound::SampleFormat::Int,
         };

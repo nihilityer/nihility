@@ -1,5 +1,5 @@
 use crate::config::ModelCapability;
-use crate::ModelModule;
+use crate::Model;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -8,13 +8,9 @@ use serde::{Deserialize, Serialize};
 pub struct SpeechRecognitionParam {
     /// f32 归一化音频数据（32-bit float PCM，经过 VAD 处理后的数据）
     pub audio_data: Vec<f32>,
-    /// 采样率 (如 16000, 44100)
-    pub sample_rate: u32,
-    /// 声道数 (1 为单声道, 2 为立体声)
-    pub channels: u8,
 }
 
-impl ModelModule {
+impl Model {
     /// 语音识别
     pub async fn speech_recognition(
         &self,
@@ -23,11 +19,7 @@ impl ModelModule {
         self.pool
             .invoke(ModelCapability::SpeechRecognition, |provider| {
                 let audio_data = param.audio_data.clone();
-                async move {
-                    provider
-                        .speech_recognition(&audio_data, param.sample_rate, param.channels)
-                        .await
-                }
+                async move { provider.speech_recognition(&audio_data).await }
             })
             .await
     }

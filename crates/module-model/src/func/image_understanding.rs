@@ -1,7 +1,7 @@
 use crate::config::ModelCapability;
 use crate::error::Result;
 use crate::provider::BoxStream;
-use crate::ModelModule;
+use crate::Model;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +23,7 @@ pub struct ImageUnderstandingStreamParam {
     pub prompt: String,
 }
 
-impl ModelModule {
+impl Model {
     /// 图片理解
     pub async fn image_understanding(&self, param: &ImageUnderstandingParam) -> Result<String> {
         self.pool

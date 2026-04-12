@@ -12,11 +12,11 @@ use std::sync::Arc;
 use tracing::info;
 
 /// 模型模块主结构
-pub struct ModelModule {
+pub struct Model {
     pool: Arc<ModelPool>,
 }
 
-impl ModelModule {
+impl Model {
     /// 从配置文件初始化
     pub async fn init_from_file_config() -> Result<Self> {
         Self::init(nihility_config::get_config::<ModelConfig>(env!(

@@ -18,10 +18,10 @@ pub enum EdgeDeviceControlError {
     Image(#[from] image::ImageError),
 
     #[error(transparent)]
-    Hound(#[from] hound::Error),
+    BrowserControl(#[from] nihility_module_browser_control::error::BrowserControlError),
 
     #[error(transparent)]
-    BrowserControl(#[from] nihility_module_browser_control::error::BrowserControlError),
+    Model(#[from] nihility_module_model::error::ModelError),
 
     #[error(transparent)]
     Vad(#[from] nihility_util_vad::error::VoiceActivityDetectionError),

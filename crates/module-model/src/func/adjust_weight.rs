@@ -1,4 +1,4 @@
-use crate::ModelModule;
+use crate::Model;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,7 @@ pub struct AdjustWeightParam {
     pub new_weight: u32,
 }
 
-impl ModelModule {
+impl Model {
     /// 手动调整权重
     pub async fn adjust_weight(&self, param: &AdjustWeightParam) {
         self.pool

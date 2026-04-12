@@ -5,16 +5,14 @@ use crate::error::*;
 use crate::silero::{Silero, SileroConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use tokio::sync::broadcast::{channel, Receiver};
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::unbounded_channel;
 use tokio::task::JoinHandle;
-use tracing::debug;
+use tracing::{debug, error, info};
 
 /// 语音活动检测配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceActivityDetectionConfig {
-    pub speech_channel_size: usize,
-    pub probability_channel_size: usize,
     pub padding_size: usize,
     pub threshold: f32,
     pub silero_config: SileroConfig,
@@ -26,13 +24,15 @@ pub struct VoiceActivityDetectionConfig {
 pub async fn start_vad(
     config: VoiceActivityDetectionConfig,
     mut sample_receiver: mpsc::UnboundedReceiver<f32>,
-) -> Result<(Receiver<Vec<f32>>, JoinHandle<Result<()>>)> {
+) -> Result<(mpsc::UnboundedReceiver<Vec<f32>>, JoinHandle<Result<()>>)> {
     debug!("Starting VoiceActivityDetection with config {:?}", &config);
-    let (speech_sender, speech_receiver) = channel(config.speech_channel_size);
+    let (speech_sender, speech_receiver) = unbounded_channel();
 
     let mut silero = Silero::init(config.silero_config.clone())?;
 
+    let speech_sender = speech_sender.clone();
     let join_handle = tokio::spawn(async move {
+        info!("Voice Activity Detection task started");
         let mut buffer =
             VecDeque::with_capacity(silero.config.chunk_size * (config.padding_size + 2));
         let mut cumulative_sample_count: usize = 0;
@@ -63,7 +63,9 @@ pub async fn start_vad(
                             // 如果当前处于活动状态，标志活动语言结束，发送当前缓冲区内所有数据，并且重置缓冲区
                             is_speech_active = false;
                             silence_count = 0;
-                            speech_sender.send(buffer.drain(..).collect())?;
+                            if speech_sender.send(buffer.drain(..).collect()).is_err() {
+                                error!("Error sending voice activity audio");
+                            }
                         } else {
                             // 当静音块数量超过设置边界数量，移除最早的音频数据块
                             if silence_count != config.padding_size {
@@ -75,6 +77,7 @@ pub async fn start_vad(
                 }
             }
         }
+        info!("Voice activity detection complete");
         Result::Ok(())
     });
     Ok((speech_receiver, join_handle))
@@ -83,11 +86,9 @@ pub async fn start_vad(
 impl Default for VoiceActivityDetectionConfig {
     fn default() -> Self {
         Self {
-            speech_channel_size: 5,
             silero_config: SileroConfig::default(),
-            padding_size: 4,
+            padding_size: 10,
             threshold: 0.01,
-            probability_channel_size: 0,
         }
     }
 }

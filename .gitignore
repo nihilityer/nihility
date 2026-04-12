@@ -24,6 +24,7 @@ log
 data
 output
 ref
+model
 
 # Logs
 logs

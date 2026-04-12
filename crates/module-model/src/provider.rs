@@ -56,18 +56,8 @@ pub trait ModelProvider: Send + Sync {
     }
 
     /// 语音识别
-    async fn speech_recognition(
-        &self,
-        audio_data: &[f32],
-        sample_rate: u32,
-        channels: u8,
-    ) -> Result<String> {
-        debug!(
-            "speech_recognition: sample_rate: {}, channels: {}, data_len: {}",
-            sample_rate,
-            channels,
-            audio_data.len()
-        );
+    async fn speech_recognition(&self, audio_data: &[f32]) -> Result<String> {
+        debug!("speech_recognition: data_len: {}", audio_data.len());
         Err(ModelError::Unsupported(
             "speech_recognition is not supported".to_string(),
         ))

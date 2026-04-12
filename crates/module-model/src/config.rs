@@ -1,5 +1,5 @@
 use crate::provider::openai_api::OpenAiApiConfig;
-use crate::provider::sense_voice::SenseVoiceConfig;
+use crate::provider::sense_voice::{SenseVoiceConfig, SenseVoiceLanguage, SenseVoiceTextNorm};
 use serde::{Deserialize, Serialize};
 
 /// 模型能力类型枚举
@@ -106,11 +106,42 @@ fn default_weight() -> u32 {
 }
 
 /// 模型模块主配置结构
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ModelConfig {
     /// 模型列表
     pub models: Vec<ModelEntry>,
     /// 负载均衡配置
     #[serde(default)]
     pub load_balance: LoadBalanceConfig,
+}
+
+impl Default for ModelConfig {
+    fn default() -> Self {
+        Self {
+            models: vec![
+                ModelEntry {
+                    name: "embed-sense-voice".to_string(),
+                    provider: ProviderType::Embed(EmbedProvider::SenseVoice(SenseVoiceConfig {
+                        language: SenseVoiceLanguage::Zh,
+                        text_norm: SenseVoiceTextNorm::WithItn,
+                        remove_status_token: false,
+                        ..Default::default()
+                    })),
+                    weight: 1,
+                    capabilities: vec![ModelCapability::SpeechRecognition],
+                },
+                ModelEntry {
+                    name: "llama.cpp".to_string(),
+                    provider: ProviderType::OpenAI(OpenAiApiConfig {
+                        base_url: "http://127.0.0.1:8000/v1".to_string(),
+                        api_key: "test".to_string(),
+                        model: "Qwen3.5-9B".to_string(),
+                    }),
+                    weight: 1,
+                    capabilities: vec![ModelCapability::TextCompletion],
+                },
+            ],
+            load_balance: Default::default(),
+        }
+    }
 }
