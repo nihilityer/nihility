@@ -1,6 +1,7 @@
 use axum::http;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use nihility_store_operate::StoreError;
 use tracing::error;
 
 pub(crate) type Result<T> = core::result::Result<T, NihilityServerError>;
@@ -23,8 +24,8 @@ pub enum NihilityServerError {
     Db(#[from] sea_orm::DbErr),
     #[error(transparent)]
     Http(#[from] http::Error),
-    #[error("Build password hash error: {0}")]
-    PasswordHash(argon2::password_hash::Error),
+    #[error("Password hash error: {0}")]
+    PasswordHash(String),
     #[error("JWT encoding error: {0}")]
     Jwt(#[from] jsonwebtoken::errors::Error),
     #[error(transparent)]
@@ -33,6 +34,16 @@ pub enum NihilityServerError {
     ModuleManager(#[from] nihility_module_manager::error::ModuleManagerError),
     #[error(transparent)]
     ConfigError(#[from] nihility_config::ConfigError),
+}
+
+impl From<StoreError> for NihilityServerError {
+    fn from(err: StoreError) -> Self {
+        match err {
+            StoreError::Database(db_err) => NihilityServerError::Db(db_err),
+            StoreError::NotFound(msg) => NihilityServerError::NotFound(msg),
+            StoreError::PasswordHash(e) => NihilityServerError::PasswordHash(e.to_string()),
+        }
+    }
 }
 
 impl IntoResponse for NihilityServerError {

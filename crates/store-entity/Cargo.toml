@@ -1,5 +1,5 @@
 [package]
-name = "nihility-server-entity"
+name = "nihility-store-entity"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

@@ -1,6 +1,5 @@
 pub use crate::error::ConfigError;
 use schemars::JsonSchema;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fs;
@@ -8,7 +7,6 @@ use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::Path;
 use tracing::debug;
-use uuid::Uuid;
 
 mod error;
 
@@ -78,7 +76,7 @@ where
 #[cfg(feature = "db")]
 pub async fn get_config_with_db<T>(
     module_name: &str,
-    conn: &DatabaseConnection,
+    conn: &sea_orm::DatabaseConnection,
 ) -> Result<T, ConfigError>
 where
     T: Serialize + DeserializeOwned + Default + JsonSchema,
@@ -86,63 +84,54 @@ where
     if check_config_exists(module_name)? {
         return get_config(module_name);
     }
-    let entity_result = nihility_server_entity::module_config::Entity::find()
-        .filter(nihility_server_entity::module_config::Column::ModuleName.eq(module_name))
-        .one(conn)
-        .await?;
-    if let Some(record) = entity_result {
-        let config: T = serde_json::from_value(record.config_value)
+
+    match nihility_store_operate::module_config::find_by_module_name(conn, module_name).await {
+        Ok(record) => {
+            let config: T = serde_json::from_value(record.config_value)
+                .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+            debug!("Loaded config from database for module: {}", module_name);
+            Ok(config)
+        }
+        Err(nihility_store_operate::StoreError::NotFound(_)) => {
+            let default_config = T::default();
+            let json_value = serde_json::to_value(&default_config)
+                .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
+            let json_schema = serde_json::to_value(schemars::schema_for!(T))
+                .map_err(|e| ConfigError::SchemaGen(e.to_string()))?;
+            nihility_store_operate::module_config::upsert(
+                conn,
+                module_name,
+                json_value,
+                json_schema,
+            )
+            .await
             .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
-        debug!("Loaded config from database for module: {}", module_name);
-        return Ok(config);
+            debug!(
+                "Created default config in database for module: {}",
+                module_name
+            );
+            Ok(default_config)
+        }
+        Err(e) => Err(ConfigError::InvalidConfig(e.to_string())),
     }
-    let default_config = T::default();
-    set_config_with_db(module_name, &default_config, conn).await?;
-    debug!(
-        "Created default config in database for module: {}",
-        module_name
-    );
-    Ok(default_config)
 }
 
 #[cfg(feature = "db")]
 pub async fn set_config_with_db<T>(
     module_name: &str,
     config: &T,
-    conn: &DatabaseConnection,
+    conn: &sea_orm::DatabaseConnection,
 ) -> Result<(), ConfigError>
 where
     T: Serialize + JsonSchema,
 {
     let json_value =
         serde_json::to_value(config).map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
-    let json_schema = serde_json::to_value(&schemars::schema_for!(T))
+    let json_schema = serde_json::to_value(schemars::schema_for!(T))
         .map_err(|e| ConfigError::SchemaGen(e.to_string()))?;
-    let now = chrono::Utc::now().with_timezone(&chrono::FixedOffset::east_opt(0).unwrap());
-    let existing = nihility_server_entity::module_config::Entity::find()
-        .filter(nihility_server_entity::module_config::Column::ModuleName.eq(module_name))
-        .one(conn)
-        .await?;
-    if let Some(record) = existing {
-        // Update existing
-        let mut active_model: nihility_server_entity::module_config::ActiveModel = record.into();
-        active_model.config_value = Set(json_value);
-        active_model.json_schema = Set(json_schema);
-        active_model.updated_at = Set(now);
-        active_model.update(conn).await?;
-    } else {
-        // Insert new
-        let active_model = nihility_server_entity::module_config::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            module_name: Set(module_name.to_string()),
-            config_value: Set(json_value),
-            json_schema: Set(json_schema),
-            created_at: Set(now),
-            updated_at: Set(now),
-        };
-        active_model.insert(conn).await?;
-    }
-
+    nihility_store_operate::module_config::upsert(conn, module_name, json_value, json_schema)
+        .await
+        .map_err(|e| ConfigError::InvalidConfig(e.to_string()))?;
     debug!("Saved config to database for module: {}", module_name);
     Ok(())
 }

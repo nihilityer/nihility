@@ -5,23 +5,24 @@ use crate::analysis::command_analysis::CommandAnalyzer;
 use crate::analysis::intent_recognition::IntentAnalyzer;
 use crate::{AnalyzerType, ContentData, MessageMetadata, MessagePoolConfig, MessagePoolError};
 use async_trait::async_trait;
-use nihility_server_entity::sea_orm_active_enums::MsgType;
+use nihility_store_operate::message::MsgType;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
+use uuid::Uuid;
 
 /// 分析上下文
 #[derive(Debug, Clone)]
 pub struct AnalysisContext {
-    pub scene_id: String,
-    pub message_id: String,
+    pub scene_id: Uuid,
+    pub message_id: Uuid,
 }
 
 /// 分析任务消息
 #[derive(Debug, Clone)]
 pub struct AnalysisTask {
-    pub scene_id: String,
-    pub message_id: String,
+    pub scene_id: Uuid,
+    pub message_id: Uuid,
 }
 
 /// 分析器特征
@@ -124,11 +125,11 @@ impl AnalysisEngine {
             );
 
             // 从数据库加载消息内容
-            match Self::load_message(&conn, &task.message_id).await {
+            match Self::load_message(&conn, task.message_id).await {
                 Ok((_, content, metadata)) => {
                     let context = AnalysisContext {
-                        scene_id: task.scene_id.clone(),
-                        message_id: task.message_id.clone(),
+                        scene_id: task.scene_id,
+                        message_id: task.message_id,
                     };
 
                     // 执行分析链
@@ -167,18 +168,11 @@ impl AnalysisEngine {
     /// 从数据库加载消息
     async fn load_message(
         conn: &sea_orm::DatabaseConnection,
-        message_id: &str,
+        message_id: Uuid,
     ) -> Result<(MsgType, ContentData, MessageMetadata), MessagePoolError> {
-        use nihility_server_entity::message::Entity as MessageEntity;
-        use sea_orm::EntityTrait;
+        use nihility_store_operate::message;
 
-        let uuid = uuid::Uuid::parse_str(message_id)
-            .map_err(|_| MessagePoolError::MessageNotFound(message_id.to_string()))?;
-
-        let message = MessageEntity::find_by_id(uuid)
-            .one(conn)
-            .await?
-            .ok_or_else(|| MessagePoolError::MessageNotFound(message_id.to_string()))?;
+        let message = message::find_message_by_id(conn, message_id).await?;
 
         let msg_type = message.msg_type;
         let content: ContentData = serde_json::from_value(message.content)?;

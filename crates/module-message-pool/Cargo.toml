@@ -13,7 +13,7 @@ publish.workspace = true
 [dependencies]
 nihility-config = { workspace = true }
 nihility-module = { workspace = true }
-nihility-server-entity = { workspace = true }
+nihility-store-operate = { workspace = true }
 
 uuid = { workspace = true }
 tracing = { workspace = true }
@@ -22,9 +22,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
-async-recursion = { workspace = true }
 anyhow = { workspace = true }
-chrono = { workspace = true }
 
 tokio = { workspace = true }
 sea-orm = { workspace = true }

@@ -23,7 +23,6 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
 async-stream = { workspace = true }
-argon2 = { workspace = true }
 chrono = { workspace = true }
 jsonwebtoken = { workspace = true }
 tracing = { workspace = true }
@@ -35,6 +34,6 @@ uuid = { workspace = true }
 
 nihility-config = { workspace = true }
 nihility-secret = { workspace = true }
-nihility-server-entity = { workspace = true }
-nihility-server-migration = { workspace = true }
+nihility-store-migration = { workspace = true }
+nihility-store-operate = { workspace = true }
 nihility-module-manager = { workspace = true }

@@ -1,9 +1,7 @@
 use crate::{MessagePool, MessagePoolError};
-use nihility_server_entity::message;
-use nihility_server_entity::prelude::Message;
-use nihility_server_entity::scene::Column as SceneColumn;
+use nihility_store_operate::message;
+use nihility_store_operate::scene;
 use schemars::JsonSchema;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,7 +9,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ProcessSceneMessagesParam {
     /// 场景 ID
-    pub scene_id: String,
+    pub scene_id: Uuid,
     /// 是否同时处理直接子场景（默认 false）
     #[serde(default = "default_process_children")]
     pub process_children: bool,
@@ -27,7 +25,7 @@ pub struct ProcessMessagesResult {
     /// 处理的消息数量
     pub processed_count: usize,
     /// 已处理的消息 ID 列表
-    pub processed_message_ids: Vec<String>,
+    pub processed_message_ids: Vec<Uuid>,
 }
 
 impl MessagePool {
@@ -36,30 +34,22 @@ impl MessagePool {
         &self,
         param: ProcessSceneMessagesParam,
     ) -> Result<ProcessMessagesResult, MessagePoolError> {
-        let scene_uuid = Uuid::parse_str(&param.scene_id)
-            .map_err(|_| MessagePoolError::SceneNotFound(param.scene_id.clone()))?;
-
         // Collect scene IDs to process (self + direct children if requested)
-        let mut scene_ids = vec![scene_uuid];
+        let mut scene_ids = vec![param.scene_id];
         if param.process_children {
-            scene_ids.extend(self.collect_direct_child_scene_ids(scene_uuid).await?);
+            scene_ids.extend(self.collect_direct_child_scene_ids(param.scene_id).await?);
         }
 
-        // Find all unprocessed messages in these scenes
-        let messages = Message::find()
-            .filter(message::Column::SceneId.is_in(scene_ids.clone()))
-            .filter(message::Column::IsProcessed.eq(false))
-            .all(&self.conn)
-            .await?;
+        // Find all unprocessed messages in these scenes using store_operate
+        let messages =
+            message::find_unprocessed_messages_by_scene_ids(&self.conn, &scene_ids).await?;
 
         let mut processed_ids = Vec::new();
 
-        // Mark each message as processed
-        for message in messages {
-            processed_ids.push(message.id.to_string());
-            let mut active_model = message.into_active_model();
-            active_model.is_processed = Set(true);
-            active_model.update(&self.conn).await?;
+        // Mark each message as processed using store_operate
+        for msg in messages {
+            processed_ids.push(msg.id);
+            message::update_message_processed(&self.conn, &msg.id, true).await?;
         }
 
         Ok(ProcessMessagesResult {
@@ -73,10 +63,7 @@ impl MessagePool {
         &self,
         parent_id: Uuid,
     ) -> Result<Vec<Uuid>, MessagePoolError> {
-        let children = nihility_server_entity::scene::Entity::find()
-            .filter(SceneColumn::ParentId.eq(parent_id))
-            .all(&self.conn)
-            .await?;
+        let children = scene::find_scenes_by_parent_id(&self.conn, parent_id).await?;
 
         Ok(children.into_iter().map(|c| c.id).collect())
     }

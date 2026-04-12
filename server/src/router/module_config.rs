@@ -1,11 +1,11 @@
 use crate::error::*;
 use crate::router::not_found;
-use crate::service::ModuleConfigService;
 use crate::AppState;
 use axum::extract::{Path, State};
 use axum::routing::{get, put};
 use axum::{Json, Router};
 use chrono::{DateTime, FixedOffset};
+use nihility_store_operate::module_config;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -51,10 +51,8 @@ pub struct ModuleConfigUpdateRequest {
 }
 
 /// 获取所有模块配置列表
-pub async fn list_configs(
-    State(state): State<AppState>,
-) -> Result<Json<ModuleConfigListResponse>> {
-    let configs = ModuleConfigService::list_all(&state.conn).await?;
+pub async fn list_configs(State(state): State<AppState>) -> Result<Json<ModuleConfigListResponse>> {
+    let configs = module_config::list_all(&state.conn).await?;
     let total = configs.len() as u64;
 
     let summaries: Vec<ModuleConfigSummary> = configs
@@ -66,7 +64,10 @@ pub async fn list_configs(
         })
         .collect();
 
-    Ok(Json(ModuleConfigListResponse { configs: summaries, total }))
+    Ok(Json(ModuleConfigListResponse {
+        configs: summaries,
+        total,
+    }))
 }
 
 /// 根据模块名称获取配置
@@ -74,7 +75,7 @@ pub async fn get_config_by_module_name(
     State(state): State<AppState>,
     Path(module_name): Path<String>,
 ) -> Result<Json<ModuleConfigResponse>> {
-    let config = ModuleConfigService::find_by_module_name(&state.conn, &module_name).await?;
+    let config = module_config::find_by_module_name(&state.conn, &module_name).await?;
 
     Ok(Json(ModuleConfigResponse {
         id: config.id,
@@ -92,7 +93,7 @@ pub async fn update_config(
     Path(id): Path<Uuid>,
     Json(request): Json<ModuleConfigUpdateRequest>,
 ) -> Result<Json<ModuleConfigResponse>> {
-    let config = ModuleConfigService::update(&state.conn, &id, request.config_value).await?;
+    let config = module_config::update_config_value(&state.conn, &id, request.config_value).await?;
 
     Ok(Json(ModuleConfigResponse {
         id: config.id,

@@ -1,5 +1,5 @@
 [package]
-name = "nihility-server-migration"
+name = "nihility-store-migration"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -18,4 +18,4 @@ tracing = { workspace = true }
 sea-orm-migration = { workspace = true }
 
 nihility-secret = { workspace = true }
-nihility-server-entity = { workspace = true }
+nihility-store-entity = { workspace = true }

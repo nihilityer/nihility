@@ -1,12 +1,11 @@
 pub mod error;
 mod router;
-mod service;
 
 use crate::error::*;
 use crate::router::JwtKeys;
 use nihility_module_manager::ModuleManager;
 use nihility_secret::generate_secret;
-use nihility_server_migration::{Migrator, MigratorTrait};
+use nihility_store_migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

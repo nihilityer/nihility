@@ -1,12 +1,12 @@
 use crate::error::*;
 use crate::router::not_found;
-use crate::service::HtmlPageService;
 use crate::AppState;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use chrono::{DateTime, FixedOffset};
+use nihility_store_operate::html_page;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -29,7 +29,7 @@ pub struct HtmlPageSummary {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HtmlPageListResponse {
     pub pages: Vec<HtmlPageSummary>,
-    pub total: u64,
+    pub total: usize,
 }
 
 /// HTML 页面完整响应
@@ -85,8 +85,8 @@ impl HtmlPageRequest {
 
 /// 获取所有 HTML 页面列表
 pub async fn list_pages(State(state): State<AppState>) -> Result<Json<HtmlPageListResponse>> {
-    let pages = HtmlPageService::list_all(&state.conn).await?;
-    let total = HtmlPageService::count_all(&state.conn).await?;
+    let pages = html_page::list_all(&state.conn).await?;
+    let total = pages.len();
 
     let summaries = pages
         .into_iter()
@@ -108,7 +108,7 @@ pub async fn get_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<HtmlPageResponse>> {
-    let page = HtmlPageService::find_by_id(&state.conn, &id).await?;
+    let page = html_page::find_by_id(&state.conn, &id).await?;
 
     Ok(Json(HtmlPageResponse {
         id: page.id,
@@ -123,11 +123,9 @@ pub async fn create_page(
     State(state): State<AppState>,
     Json(request): Json<HtmlPageRequest>,
 ) -> Result<Json<HtmlPageResponse>> {
-    // 验证请求
     request.validate()?;
 
-    // 创建页面
-    let page = HtmlPageService::create(&state.conn, request.path, request.html).await?;
+    let page = html_page::create(&state.conn, request.path, request.html).await?;
 
     Ok(Json(HtmlPageResponse {
         id: page.id,
@@ -143,11 +141,9 @@ pub async fn update_page(
     Path(id): Path<Uuid>,
     Json(request): Json<HtmlPageRequest>,
 ) -> Result<Json<HtmlPageResponse>> {
-    // 验证请求
     request.validate()?;
 
-    // 更新页面
-    let page = HtmlPageService::update(&state.conn, &id, request.path, request.html).await?;
+    let page = html_page::update(&state.conn, &id, request.path, request.html).await?;
 
     Ok(Json(HtmlPageResponse {
         id: page.id,
@@ -162,6 +158,6 @@ pub async fn delete_page(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode> {
-    HtmlPageService::delete(&state.conn, &id).await?;
+    html_page::delete(&state.conn, &id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

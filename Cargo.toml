@@ -37,8 +37,9 @@ nihility-module-message-pool = { path = "crates/module-message-pool" }
 nihility-module-manager = { path = "crates/module-manager" }
 nihility-secret = { path = "crates/secret" }
 nihility-server = { path = "server" }
-nihility-server-entity = { path = "crates/server-entity" }
-nihility-server-migration = { path = "crates/server-migration" }
+nihility-store-entity = { path = "crates/store-entity" }
+nihility-store-migration = { path = "crates/store-migration" }
+nihility-store-operate = { path = "crates/store-operate" }
 
 http = { version = "1.4" }
 axum = { version = "0.8", features = ["macros", "ws"] }

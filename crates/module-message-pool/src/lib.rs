@@ -10,6 +10,7 @@ use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::info;
+use uuid::Uuid;
 
 /// 分析器类型枚举
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -45,7 +46,7 @@ fn default_priority() -> i32 {
 /// 消息池模块配置
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MessagePoolConfig {
-    /// 启用的分析器列表
+    /// 分析器列表
     #[serde(default)]
     pub analyzers: Vec<AnalyzerConfig>,
 }
@@ -57,7 +58,7 @@ impl Default for MessagePoolConfig {
                 AnalyzerConfig {
                     analyzer_type: AnalyzerType::CommandAnalysis,
                     enabled: true,
-                    priority: -10000,
+                    priority: i32::MIN,
                 },
                 AnalyzerConfig {
                     analyzer_type: AnalyzerType::IntentRecognition,
@@ -111,18 +112,12 @@ pub enum ContentData {
 
 impl ContentData {
     /// 获取对应的 MsgType
-    pub fn to_msg_type(&self) -> nihility_server_entity::sea_orm_active_enums::MsgType {
+    pub fn to_msg_type(&self) -> nihility_store_operate::message::MsgType {
         match self {
-            ContentData::Text { .. } => nihility_server_entity::sea_orm_active_enums::MsgType::Text,
-            ContentData::Audio { .. } => {
-                nihility_server_entity::sea_orm_active_enums::MsgType::Audio
-            }
-            ContentData::Image { .. } => {
-                nihility_server_entity::sea_orm_active_enums::MsgType::Image
-            }
-            ContentData::Video { .. } => {
-                nihility_server_entity::sea_orm_active_enums::MsgType::Video
-            }
+            ContentData::Text { .. } => nihility_store_operate::message::MsgType::Text,
+            ContentData::Audio { .. } => nihility_store_operate::message::MsgType::Audio,
+            ContentData::Image { .. } => nihility_store_operate::message::MsgType::Image,
+            ContentData::Video { .. } => nihility_store_operate::message::MsgType::Video,
         }
     }
 }
@@ -194,7 +189,7 @@ impl MessagePool {
     }
 
     /// 触发分析链
-    pub fn trigger_analysis(&self, scene_id: String, message_id: String) {
+    pub fn trigger_analysis(&self, scene_id: Uuid, message_id: Uuid) {
         let task = AnalysisTask {
             scene_id,
             message_id,

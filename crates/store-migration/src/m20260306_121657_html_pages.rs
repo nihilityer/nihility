@@ -1,4 +1,4 @@
-use nihility_server_entity::html_pages;
+use nihility_store_entity::html_pages;
 use sea_orm_migration::sea_orm::{ActiveModelTrait, Set};
 use sea_orm_migration::{prelude::*, schema::*};
 use uuid::Uuid;

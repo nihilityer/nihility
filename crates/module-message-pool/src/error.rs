@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 pub(crate) type Result<T> = core::result::Result<T, MessagePoolError>;
 
 #[derive(thiserror::Error, Debug)]
@@ -6,7 +8,7 @@ pub enum MessagePoolError {
     Config(#[from] nihility_config::ConfigError),
 
     #[error(transparent)]
-    Db(#[from] sea_orm::DbErr),
+    Store(#[from] nihility_store_operate::error::StoreError),
 
     #[error(transparent)]
     Uuid(#[from] uuid::Error),
@@ -14,10 +16,9 @@ pub enum MessagePoolError {
     #[error(transparent)]
     SerdeJson(#[from] serde_json::error::Error),
 
-    // Business logic errors (custom descriptions)
     #[error("Scene not found: {0}")]
-    SceneNotFound(String),
+    SceneNotFound(Uuid),
 
     #[error("Message not found: {0}")]
-    MessageNotFound(String),
+    MessageNotFound(Uuid),
 }

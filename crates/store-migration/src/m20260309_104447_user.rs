@@ -3,7 +3,7 @@ use argon2::{
     Argon2,
 };
 use nihility_secret::generate_secret;
-use nihility_server_entity::user;
+use nihility_store_entity::user;
 use sea_orm_migration::sea_orm::{ActiveModelTrait, Set};
 use sea_orm_migration::{prelude::*, schema::*};
 use tracing::info;

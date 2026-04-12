@@ -1,5 +1,4 @@
 use crate::error::*;
-use crate::service::UserService;
 use crate::AppState;
 use axum::body::Body;
 use axum::extract::{FromRef, FromRequestParts, State};
@@ -14,6 +13,7 @@ use axum_extra::{
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use nihility_store_operate::user;
 use serde::{Deserialize, Serialize};
 
 /// 生成Jwt后最大有效时间，按分钟
@@ -26,7 +26,7 @@ pub async fn authorize(
     if payload.username.is_empty() || payload.password.is_empty() {
         return Err(NihilityServerError::MissingCredentials);
     }
-    if !UserService::check_user_password(&state.conn, payload.username.clone(), payload.password)
+    if !user::check_user_password(&state.conn, payload.username.clone(), payload.password)
         .await?
     {
         return Err(NihilityServerError::WrongCredentials);

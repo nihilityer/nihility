@@ -1,9 +1,6 @@
 use crate::{MessagePool, MessagePoolError, SceneInfo};
-use nihility_server_entity::prelude::Scene;
-use nihility_server_entity::scene;
+use nihility_store_operate::scene;
 use schemars::JsonSchema;
-use sea_orm::QueryFilter;
-use sea_orm::{ColumnTrait, EntityTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,7 +8,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GetSceneInfoParam {
     /// 场景 ID
-    pub scene_id: String,
+    pub scene_id: Uuid,
     /// 是否包含直接子场景 ID 列表（默认 true）
     #[serde(default = "default_include_children")]
     pub include_children: bool,
@@ -27,18 +24,12 @@ impl MessagePool {
         &self,
         param: GetSceneInfoParam,
     ) -> Result<SceneInfo, MessagePoolError> {
-        let scene_uuid = Uuid::parse_str(&param.scene_id)
-            .map_err(|_| MessagePoolError::SceneNotFound(param.scene_id.clone()))?;
+        let scene = scene::find_scene_by_id(&self.conn, param.scene_id)
+            .await
+            .map_err(|_| MessagePoolError::SceneNotFound(param.scene_id))?;
 
-        // Fetch current scene
-        let scene = Scene::find_by_id(scene_uuid)
-            .one(&self.conn)
-            .await?
-            .ok_or_else(|| MessagePoolError::SceneNotFound(param.scene_id.clone()))?;
-
-        // Fetch direct children IDs if requested
         let children_ids = if param.include_children {
-            self.fetch_direct_children_ids(scene_uuid).await?
+            self.fetch_direct_children_ids(param.scene_id).await?
         } else {
             vec![]
         };
@@ -57,14 +48,8 @@ impl MessagePool {
         &self,
         parent_id: Uuid,
     ) -> Result<Vec<String>, MessagePoolError> {
-        let children = Scene::find()
-            .filter(scene::Column::ParentId.eq(parent_id))
-            .all(&self.conn)
-            .await?;
+        let children = scene::find_scenes_by_parent_id(&self.conn, parent_id).await?;
 
-        Ok(children
-            .into_iter()
-            .map(|c| c.id.to_string())
-            .collect())
+        Ok(children.into_iter().map(|c| c.id.to_string()).collect())
     }
 }

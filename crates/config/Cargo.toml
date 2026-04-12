@@ -14,7 +14,7 @@ publish.workspace = true
 default = ["toml_config", "json_config", "db"]
 toml_config = ["toml"]
 json_config = ["serde_json"]
-db = ["sea-orm", "schemars", "chrono", "uuid", "nihility-server-entity"]
+db = ["sea-orm", "schemars", "chrono", "uuid", "nihility-store-operate"]
 
 [dependencies]
 tracing = { workspace = true }
@@ -28,4 +28,4 @@ sea-orm = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true }
-nihility-server-entity = { workspace = true, optional = true }
+nihility-store-operate = { workspace = true, optional = true }

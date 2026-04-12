@@ -3,13 +3,13 @@
 ## 新建迁移
 
 ```bash
-sea-orm-cli migrate generate -d crates/server-migration/ NAME_OF_MIGRATION
+sea-orm-cli migrate generate -d crates/store-migration/ NAME_OF_MIGRATION
 ```
 
 ## 根据数据库表生成`entity`文件
 
 ```bash
-sea-orm-cli generate entity -o crates/server-entity/src/ -l --entity-format dense
+sea-orm-cli generate entity -o crates/store-entity/src/ -l --entity-format dense
 ```
 
 ### 其他参数参考

@@ -17,6 +17,7 @@ const SAMPLES_PER_10SEC: usize = 16000 * 10;
 
 /// 音频缓冲状态
 struct AudioBuffer {
+    enable: bool,
     buffer: Vec<f32>,
     start_timestamp: Option<u64>,
     file_index: u32,
@@ -25,6 +26,7 @@ struct AudioBuffer {
 impl AudioBuffer {
     fn new() -> Self {
         Self {
+            enable: false,
             buffer: Vec::new(),
             start_timestamp: None,
             file_index: 0,
@@ -57,13 +59,14 @@ impl AudioBuffer {
             let file_name = format!("{}_{}_{}.wav", device_id, timestamp, self.file_index);
             let file_path = output_dir.join(&file_name);
 
-            write_wav_file(&file_path, &self.buffer[..SAMPLES_PER_10SEC])?;
-
-            info!(
-                "Audio file written: {} ({} samples)",
-                file_path.display(),
-                SAMPLES_PER_10SEC
-            );
+            if self.enable {
+                write_wav_file(&file_path, &self.buffer[..SAMPLES_PER_10SEC])?;
+                info!(
+                    "Audio file written: {} ({} samples)",
+                    file_path.display(),
+                    SAMPLES_PER_10SEC
+                );
+            }
 
             // 保留剩余数据
             let remaining: Vec<f32> = self.buffer[SAMPLES_PER_10SEC..].to_vec();
@@ -175,7 +178,6 @@ pub(crate) async fn start_message_handle(
 /// - 通道数: 1 (单通道)
 /// - 位深: 16bit
 fn write_wav_file(file_path: &PathBuf, pcm_data: &[f32]) -> Result<()> {
-    return Ok(());
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 16000,
