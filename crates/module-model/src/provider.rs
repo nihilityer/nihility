@@ -68,14 +68,14 @@ pub trait ModelProvider: Send + Sync {
 pub struct ProviderFactory;
 
 impl ProviderFactory {
-    pub fn create(provider_type: &ProviderType) -> Result<Box<dyn ModelProvider>> {
+    pub async fn create(provider_type: &ProviderType) -> Result<Box<dyn ModelProvider>> {
         match provider_type {
             ProviderType::OpenAI(config) => {
                 Ok(Box::new(openai_api::OpenAiApiProvider::new(config)?))
             }
             ProviderType::Embed(embed) => match embed {
                 crate::config::EmbedProvider::SenseVoice(cfg) => {
-                    Ok(Box::new(sense_voice::SenseVoice::init(cfg.clone())?))
+                    Ok(Box::new(sense_voice::SenseVoice::init(cfg.clone()).await?))
                 }
             },
         }

@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{ModelError, Result};
 use crate::provider::ModelProvider;
 use crate::utils::Cmvn;
 use crate::utils::Lfr;
@@ -9,10 +9,17 @@ use ort::session::builder::GraphOptimizationLevel;
 use ort::session::Session;
 use ort::value::Tensor;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 use tokenizers::Tokenizer;
 use tokio::sync::Mutex;
-use tracing::debug;
+use tracing::{debug, info};
+
+const MODEL_REPO: &str = "nihilityer/nihility";
+const MODEL_CMVN: &str = "sense_voice_bak/cmvn.npy";
+const MODEL_NAME: &str = "sense_voice_bak/model_quant.onnx";
+const MODEL_TOKENIZER: &str = "sense_voice_bak/tokenizer.json";
 
 /// SenseVoice 语音识别模型配置
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -91,33 +98,41 @@ pub enum SenseVoiceTextNorm {
 }
 
 impl SenseVoice {
-    pub fn init(config: SenseVoiceConfig) -> Result<Self> {
+    pub async fn init(config: SenseVoiceConfig) -> Result<Self> {
+        let model_dir = Path::new(&config.model_path)
+            .parent()
+            .ok_or(ModelError::Provider(format!(
+                "SenseVoice invalid model path: {:?}",
+                config.model_path
+            )))?;
+        if !fs::exists(&config.model_path)? {
+            info!("Download SenseVoice model to directory: {:?}", model_dir);
+            fs::create_dir_all(model_dir)?;
+            let hf_api = hf_hub::api::tokio::ApiBuilder::from_env()
+                .with_cache_dir(model_dir.to_path_buf())
+                .build()?;
+            let repo = hf_api.model(MODEL_REPO.to_string());
+            repo.download(MODEL_CMVN).await?;
+            repo.download(MODEL_NAME).await?;
+            repo.download(MODEL_TOKENIZER).await?;
+        }
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| {
-                crate::error::ModelError::Provider(format!(
-                    "Sense Voice Ort Session build fail: {}",
-                    e
-                ))
+                ModelError::Provider(format!("Sense Voice Ort Session build fail: {}", e))
             })?
             .with_inter_threads(1)
             .map_err(|e| {
-                crate::error::ModelError::Provider(format!(
-                    "Sense Voice Ort Session build fail: {}",
-                    e
-                ))
+                ModelError::Provider(format!("Sense Voice Ort Session build fail: {}", e))
             })?
             .with_intra_threads(1)
             .map_err(|e| {
-                crate::error::ModelError::Provider(format!(
-                    "Sense Voice Ort Session build fail: {}",
-                    e
-                ))
+                ModelError::Provider(format!("Sense Voice Ort Session build fail: {}", e))
             })?
             .commit_from_file(&config.model_path)?;
 
         let tokenizer = Tokenizer::from_file(&config.tokenizer_path)
-            .map_err(|e| crate::error::ModelError::Provider(format!("tokenizer error: {}", e)))?;
+            .map_err(|e| ModelError::Provider(format!("tokenizer error: {}", e)))?;
 
         Ok(Self {
             language: config.language,
@@ -197,15 +212,13 @@ impl SenseVoice {
             let status_token = self
                 .tokenizer
                 .decode(&status_token_ids, true)
-                .map_err(|e| {
-                    crate::error::ModelError::Provider(format!("tokenizer error: {}", e))
-                })?;
+                .map_err(|e| ModelError::Provider(format!("tokenizer error: {}", e)))?;
             debug!("SenseVoice infer status result: {:?}", status_token);
         }
 
         self.tokenizer
             .decode(&token_int, true)
-            .map_err(|e| crate::error::ModelError::Provider(format!("tokenizer error: {}", e)))
+            .map_err(|e| ModelError::Provider(format!("tokenizer error: {}", e)))
     }
 
     /// 计算输入音频数据的特征数据

@@ -16,4 +16,5 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 ndarray = { workspace = true }
 ort = { workspace = true }
+hf-hub = { workspace = true }
 thiserror = { workspace = true }

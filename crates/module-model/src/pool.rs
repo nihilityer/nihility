@@ -85,7 +85,7 @@ impl ModelPool {
         }
 
         // 创建 provider（需要 release models lock 后再获取）
-        let provider: Box<dyn ModelProvider> = ProviderFactory::create(&provider_config)?;
+        let provider: Box<dyn ModelProvider> = ProviderFactory::create(&provider_config).await?;
 
         let provider = Arc::new(provider);
 

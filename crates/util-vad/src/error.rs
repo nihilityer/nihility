@@ -3,6 +3,10 @@ pub(crate) type Result<T> = core::result::Result<T, VoiceActivityDetectionError>
 #[derive(thiserror::Error, Debug)]
 pub enum VoiceActivityDetectionError {
     #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error(transparent)]
+    HfApi(#[from] hf_hub::api::tokio::ApiError),
+    #[error(transparent)]
     Ort(#[from] ort::Error),
     #[error("Ort Session build error: {0}")]
     OrtSessionBuilder(String),

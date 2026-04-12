@@ -3,10 +3,16 @@ pub(crate) type Result<T> = core::result::Result<T, ModelError>;
 #[derive(thiserror::Error, Debug)]
 pub enum ModelError {
     #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    #[error(transparent)]
     Config(#[from] nihility_config::ConfigError),
 
     #[error(transparent)]
     Ort(#[from] ort::Error),
+
+    #[error(transparent)]
+    HfApi(#[from] hf_hub::api::tokio::ApiError),
 
     #[error(transparent)]
     ReadNpy(#[from] ndarray_npy::ReadNpyError),

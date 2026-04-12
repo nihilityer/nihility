@@ -28,7 +28,7 @@ pub async fn start_vad(
     debug!("Starting VoiceActivityDetection with config {:?}", &config);
     let (speech_sender, speech_receiver) = unbounded_channel();
 
-    let mut silero = Silero::init(config.silero_config.clone())?;
+    let mut silero = Silero::init(config.silero_config.clone()).await?;
 
     let speech_sender = speech_sender.clone();
     let join_handle = tokio::spawn(async move {

@@ -4,6 +4,12 @@ use ort::session::builder::GraphOptimizationLevel;
 use ort::session::Session;
 use ort::value::Tensor;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
+use tracing::info;
+
+const MODEL_REPO: &str = "nihilityer/nihility";
+const MODEL_NAME: &str = "silero_vad.onnx";
 
 /// Silero语音活动检测模型配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +28,25 @@ pub struct Silero {
 
 impl Silero {
     /// 使用配置初始化Silero语音活动检测模型
-    pub fn init(mut config: SileroConfig) -> Result<Self> {
+    pub async fn init(mut config: SileroConfig) -> Result<Self> {
+        let model_dir =
+            Path::new(&config.model_path)
+                .parent()
+                .ok_or(VoiceActivityDetectionError::Init(format!(
+                    "Invalid model path: {:?}",
+                    config.model_path
+                )))?;
+        if !fs::exists(&config.model_path)? {
+            info!("Download Silero model to directory: {:?}", model_dir);
+            fs::create_dir_all(model_dir)?;
+            let hf_api = hf_hub::api::tokio::ApiBuilder::from_env()
+                .with_cache_dir(model_dir.to_path_buf())
+                .build()?;
+            hf_api
+                .model(MODEL_REPO.to_string())
+                .download(MODEL_NAME)
+                .await?;
+        }
         let chunk_size = match &config.sample_rate {
             8000 => 256,
             16000 => 512,
