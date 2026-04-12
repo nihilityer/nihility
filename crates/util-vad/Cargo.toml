@@ -1,0 +1,19 @@
+[package]
+name = "nihility-util-vad"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["std"] }
+tracing = { workspace = true }
+tokio = { workspace = true }
+ndarray = { workspace = true }
+ort = { workspace = true }
+thiserror = { workspace = true }
