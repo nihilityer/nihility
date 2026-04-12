@@ -16,7 +16,6 @@ COPY crates/ ./crates/
 COPY server/ ./server/
 COPY src/ ./src/
 COPY frontend/ ./frontend/
-COPY model/ ./model/
 
 # 构建 release 版本（启用编译缓存）
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -52,7 +51,6 @@ WORKDIR /app
 
 # 复制二进制和模型
 COPY --from=builder /build/target/release/nihility-server /app/
-COPY --from=builder /build/model/ /app/model/
 
 # 创建 config 目录（运行时生成）
 RUN mkdir -p /app/config
