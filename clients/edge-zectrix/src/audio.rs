@@ -90,10 +90,10 @@ async fn record(rx_buffer: &'static mut [u8; 32736], i2s_rx: I2sRx<'static, Asyn
                 );
 
                 while accum_buffer.len() >= CHUNK_SIZE {
-                    if let Err(e) = sender.try_send(Message::AudioData(AudioData {
+                    if let Err(_) = sender.try_send(Message::AudioData(AudioData {
                         audio_data: accum_buffer[..CHUNK_SIZE].to_vec(),
                     })) {
-                        warn!("Failed to send audio data: {:?}", e);
+                        warn!("Failed to send audio data");
                     }
 
                     if accum_buffer.len() > CHUNK_SIZE {

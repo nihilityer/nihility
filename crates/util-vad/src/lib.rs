@@ -6,6 +6,7 @@ use crate::silero::{Silero, SileroConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use tokio::sync::broadcast::{channel, Receiver};
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
@@ -24,7 +25,7 @@ pub struct VoiceActivityDetectionConfig {
 /// 返回发送到的语音数据接收器
 pub async fn start_vad(
     config: VoiceActivityDetectionConfig,
-    mut sample_receiver: Receiver<f32>,
+    mut sample_receiver: mpsc::UnboundedReceiver<f32>,
 ) -> Result<(Receiver<Vec<f32>>, JoinHandle<Result<()>>)> {
     debug!("Starting VoiceActivityDetection with config {:?}", &config);
     let (speech_sender, speech_receiver) = channel(config.speech_channel_size);
@@ -38,7 +39,7 @@ pub async fn start_vad(
         let mut silence_count: usize = 0;
         let mut is_speech_active = false;
 
-        while let Ok(sample) = sample_receiver.recv().await {
+        while let Some(sample) = sample_receiver.recv().await {
             buffer.push_back(sample);
             cumulative_sample_count += 1;
             // 当新样本数量积累到一个块大小时进行识别

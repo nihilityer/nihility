@@ -24,6 +24,10 @@ pub struct Device {
     pub key_handle_task: Option<JoinHandle<Result<()>>>,
     pub screen_refresh_task: Option<JoinHandle<Result<()>>>,
     pub cancellation_token: CancellationToken,
+    pub audio_vad_task: Option<
+        JoinHandle<core::result::Result<(), nihility_util_vad::error::VoiceActivityDetectionError>>,
+    >,
+    pub audio_handle_task: Option<JoinHandle<Result<()>>>,
 }
 
 impl Device {
@@ -36,6 +40,8 @@ impl Device {
             key_handle_task: None,
             screen_refresh_task: None,
             cancellation_token: CancellationToken::new(),
+            audio_vad_task: None,
+            audio_handle_task: None,
         }
     }
 

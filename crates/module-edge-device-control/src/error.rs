@@ -23,6 +23,9 @@ pub enum EdgeDeviceControlError {
     #[error(transparent)]
     BrowserControl(#[from] nihility_module_browser_control::error::BrowserControlError),
 
+    #[error(transparent)]
+    Vad(#[from] nihility_util_vad::error::VoiceActivityDetectionError),
+
     #[error("Serialization error: {0}")]
     Serialization(String),
 
