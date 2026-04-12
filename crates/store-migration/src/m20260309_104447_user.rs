@@ -2,8 +2,8 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
 };
-use nihility_secret::generate_secret;
 use nihility_store_entity::user;
+use nihility_util_secret::generate_secret;
 use sea_orm_migration::sea_orm::{ActiveModelTrait, Set};
 use sea_orm_migration::{prelude::*, schema::*};
 use tracing::info;

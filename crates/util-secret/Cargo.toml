@@ -1,5 +1,5 @@
 [package]
-name = "nihility-secret"
+name = "nihility-util-secret"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

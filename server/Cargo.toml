@@ -33,7 +33,7 @@ sea-orm = { workspace = true }
 uuid = { workspace = true }
 
 nihility-config = { workspace = true }
-nihility-secret = { workspace = true }
+nihility-util-secret = { workspace = true }
 nihility-store-migration = { workspace = true }
 nihility-store-operate = { workspace = true }
 nihility-module-manager = { workspace = true }

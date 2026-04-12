@@ -17,5 +17,5 @@ password-hash = { workspace = true }
 tracing = { workspace = true }
 sea-orm-migration = { workspace = true }
 
-nihility-secret = { workspace = true }
+nihility-util-secret = { workspace = true }
 nihility-store-entity = { workspace = true }

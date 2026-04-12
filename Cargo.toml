@@ -35,7 +35,7 @@ nihility-module-edge-device-control = { path = "crates/module-edge-device-contro
 nihility-module-model = { path = "crates/module-model" }
 nihility-module-message-pool = { path = "crates/module-message-pool" }
 nihility-module-manager = { path = "crates/module-manager" }
-nihility-secret = { path = "crates/secret" }
+nihility-util-secret = { path = "crates/util-secret" }
 nihility-server = { path = "server" }
 nihility-store-entity = { path = "crates/store-entity" }
 nihility-store-migration = { path = "crates/store-migration" }
