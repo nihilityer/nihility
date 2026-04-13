@@ -61,6 +61,8 @@ impl EdgeDeviceControl {
             "connect to device {} with page id: {}",
             param.device_id, page_id
         );
+        // 等待几秒让页面加载完成
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
         device
             .start_screen_push(

@@ -136,3 +136,117 @@ impl Default for EdgeDeviceControlConfig {
         }
     }
 }
+
+pub async fn monitor_task(module: Arc<RwLock<EdgeDeviceControl>>) {
+    loop {
+        tokio::time::sleep(Duration::from_secs(60)).await;
+        let mut module = module.write().await;
+        if let Some(task) = module.web_socket_receive_task.as_ref()
+            && task.is_finished()
+            && let Some(task) = module.web_socket_receive_task.take()
+        {
+            match task.await {
+                Ok(Ok(())) => info!("WebSocket receive task finished"),
+                Ok(Err(e)) => {
+                    error!("WebSocket receive task failed: {}", e);
+                }
+                Err(join_err) => {
+                    error!("WebSocket receive task join failed: {}", join_err);
+                }
+            }
+        }
+
+        let mut devices = module.devices.write().await;
+
+        for device in devices.values_mut() {
+            if let Some(task) = device.audio_vad_task.as_ref()
+                && task.is_finished()
+                && let Some(task) = device.audio_vad_task.take()
+            {
+                match task.await {
+                    Ok(Ok(())) => info!("device {} audio vad task finished", device.info.device_id),
+                    Ok(Err(e)) => {
+                        error!(
+                            "device {} audio vad task failed: {}",
+                            device.info.device_id, e
+                        );
+                    }
+                    Err(join_err) => {
+                        error!(
+                            "device {} audio vad task join failed: {}",
+                            device.info.device_id, join_err
+                        );
+                    }
+                }
+            }
+            if let Some(task) = device.key_handle_task.as_ref()
+                && task.is_finished()
+                && let Some(task) = device.key_handle_task.take()
+            {
+                match task.await {
+                    Ok(Ok(())) => {
+                        info!("device {} key handle task finished", device.info.device_id)
+                    }
+                    Ok(Err(e)) => {
+                        error!(
+                            "device {} key handle task failed: {}",
+                            device.info.device_id, e
+                        );
+                    }
+                    Err(join_err) => {
+                        error!(
+                            "device {} key handle task join failed: {}",
+                            device.info.device_id, join_err
+                        );
+                    }
+                }
+            }
+            if let Some(task) = device.audio_handle_task.as_ref()
+                && task.is_finished()
+                && let Some(task) = device.audio_handle_task.take()
+            {
+                match task.await {
+                    Ok(Ok(())) => info!(
+                        "device {} audio handle task finished",
+                        device.info.device_id
+                    ),
+                    Ok(Err(e)) => {
+                        error!(
+                            "device {} audio handle task failed: {}",
+                            device.info.device_id, e
+                        );
+                    }
+                    Err(join_err) => {
+                        error!(
+                            "device {} audio handle task join failed: {}",
+                            device.info.device_id, join_err
+                        );
+                    }
+                }
+            }
+            if let Some(task) = device.screen_refresh_task.as_ref()
+                && task.is_finished()
+                && let Some(task) = device.screen_refresh_task.take()
+            {
+                match task.await {
+                    Ok(Ok(())) => info!(
+                        "device {} screen refresh task finished",
+                        device.info.device_id
+                    ),
+                    Ok(Err(e)) => {
+                        error!(
+                            "device {} screen refresh task failed: {}",
+                            device.info.device_id, e
+                        );
+                    }
+                    Err(join_err) => {
+                        error!(
+                            "device {} screen refresh task join failed: {}",
+                            device.info.device_id, join_err
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

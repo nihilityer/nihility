@@ -21,7 +21,7 @@ async fn test_screenshot() {
             .call_mut(
                 "open_page",
                 serde_json::to_value(OpenPageParam {
-                    url: "http://127.0.0.1:8080/html/test?username=admin&password=123456"
+                    url: "http://localhost:5173/#/device-display/edge-zectrix?username=admin&password=123456"
                         .to_string(),
                 })
                 .expect("failed to build open_page param"),
@@ -43,7 +43,9 @@ async fn test_screenshot() {
     let image_data = browser_control
         .screenshot(ScreenshotParam {
             page_id,
-            selector: Some("#app > div".to_string()),
+            selector: Some(
+                "#app > section > section > main > div > section > main > div".to_string(),
+            ),
         })
         .await
         .expect("screenshot failed");

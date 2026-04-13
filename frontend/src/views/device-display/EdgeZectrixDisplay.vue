@@ -86,15 +86,9 @@
               </div>
             </div>
 
-            <!-- 第三页：随机图片 -->
-            <div v-show="currentPage === 2" class="page page-image">
-              <img
-                :src="currentImage"
-                alt="随机图片"
-                class="random-image"
-                @load="onImageLoad"
-                @error="onImageError"
-              />
+            <!-- 第三页：ASCII 艺术 -->
+            <div v-show="currentPage === 2" class="page page-ascii">
+              <pre class="ascii-art">{{ currentAsciiArt }}</pre>
             </div>
           </div>
 
@@ -162,41 +156,89 @@ const weatherError = ref(false)
 const currentImage = ref('')
 const imageLoading = ref(false)
 
+// ASCII 艺术图案库（适配单色显示）
+const asciiArtPatterns = [
+  `  .----.
+  / o  o \\
+ |   <>   |
+  \\  ..  /
+   '----'`,
+  `    *    *
+   /|  |\\
+  / |  | \\
+ *--*--*--*
+  \\ |  | /
+   \\|  |/
+    '**'`,
+  `  /\\
+ /  \\
+/    \\
+| 机械 |
+| 之心 |
+ \\____/`,
+  `  .------.
+  |  --   |
+  |  \\/   |
+  |       |
+  |_______|
+  '------'`,
+]
+
+const currentAsciiArt = ref('')
+
+// ASCII 艺术定时器
+let asciiInterval: ReturnType<typeof setInterval> | null = null
+
+// 更新 ASCII 艺术
+const updateAsciiArt = () => {
+  const randomIndex = Math.floor(Math.random() * asciiArtPatterns.length)
+  currentAsciiArt.value = asciiArtPatterns[randomIndex] ?? ''
+}
+
+// 设置 ASCII 艺术定时器
+const setupAsciiArtInterval = () => {
+  if (asciiInterval) {
+    clearInterval(asciiInterval)
+  }
+  updateAsciiArt()
+  asciiInterval = setInterval(updateAsciiArt, config.value.imageRefreshInterval * 1000)
+}
+
 // 时间更新定时器
 let timeInterval: ReturnType<typeof setInterval> | null = null
 // 图片刷新定时器
 let imageInterval: ReturnType<typeof setInterval> | null = null
 
-// WMO 天气代码到 Emoji 图标的映射
+// WMO 天气代码到 ASCII 符号的映射（适配单色显示）
 const weatherCodeToIcon: Record<number, string> = {
-  0: '☀️',  // 晴朗
-  1: '🌤️',  // 大部晴朗
-  2: '⛅',  // 部分多云
-  3: '☁️',  // 阴天
-  45: '🌫️',  // 雾
-  48: '🌫️',  // 雾凇
-  51: '🌧️',  // 小毛毛雨
-  53: '🌧️',  // 中毛毛雨
-  55: '🌧️',  // 大毛毛雨
-  56: '🌧️',  // 冻毛毛雨
-  57: '🌧️',  // 冻毛毛雨
-  61: '🌧️',  // 小雨
-  63: '🌧️',  // 中雨
-  65: '🌧️',  // 大雨
-  66: '🌧️',  // 冻雨
-  67: '🌧️',  // 冻雨
-  71: '🌨️',  // 小雪
-  73: '🌨️',  // 中雪
-  75: '❄️',  // 大雪
-  77: '🌨️',  // 雪粒
-  80: '🌦️',  // 小阵雨
-  81: '🌦️',  // 中阵雨
-  82: '🌦️',  // 大阵雨
-  85: '🌨️',  // 小阵雪
-  86: '🌨️',  // 大阵雪
-  95: '⛈️',  // 雷暴
-  96: '⛈️',  // 雷暴伴小冰雹
-  99: '⛈️',  // 雷暴伴大冰雹
+  0: '*',   // 晴朗
+  1: '*',   // 大部晴朗
+  2: '~',   // 部分多云
+  3: '~',   // 阴天
+  45: '=',  // 雾
+  48: '=',  // 雾凇
+  51: '#',  // 小毛毛雨
+  53: '#',  // 中毛毛雨
+  55: '#',  // 大毛毛雨
+  56: '#',  // 冻毛毛雨
+  57: '#',  // 冻毛毛雨
+  61: '#',  // 小雨
+  63: '#',  // 中雨
+  65: '#',  // 大雨
+  66: '#',  // 冻雨
+  67: '#',  // 冻雨
+  71: '*',  // 小雪
+  73: '*',  // 中雪
+  75: '*',  // 大雪
+  77: '*',  // 雪粒
+  80: '#',  // 小阵雨
+  81: '#',  // 中阵雨
+  82: '#',  // 大阵雨
+  85: '*',  // 小阵雪
+  86: '*',  // 大阵雪
+  95: '#',  // 雷暴
+  96: '#',  // 雷暴伴小冰雹
+  99: '#',  // 雷暴伴大冰雹
 }
 
 // WMO 天气代码到中文描述的映射
@@ -245,13 +287,12 @@ const weatherDescription = computed(() => {
   return desc || '未知'
 })
 
-// 格式化时间
+// 格式化时间（取消秒显示，适配墨水屏刷新）
 const updateTime = () => {
   const now = new Date()
   currentTime.value = now.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false,
   })
   currentDate.value = now.toLocaleDateString('zh-CN', {
@@ -414,6 +455,7 @@ onMounted(() => {
   }
 
   setupIntervals()
+  setupAsciiArtInterval()
 
   // 聚焦到展示容器以接收键盘事件
   const container = document.querySelector('.display-container') as HTMLElement
@@ -427,6 +469,9 @@ onUnmounted(() => {
   }
   if (imageInterval) {
     clearInterval(imageInterval)
+  }
+  if (asciiInterval) {
+    clearInterval(asciiInterval)
   }
 })
 </script>
@@ -504,50 +549,52 @@ onUnmounted(() => {
   align-items: center;
 }
 
-// 首页：时间日期
+// 首页：时间日期（单色适配）
 .page-datetime {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: #fff;
+  color: #000;
 
   .datetime-content {
     text-align: center;
+    font-family: 'Courier New', Consolas, monospace;
 
     .time {
-      font-size: 48px;
-      font-weight: 300;
-      letter-spacing: 2px;
+      font-size: 64px;
+      font-weight: 700;
+      letter-spacing: 4px;
     }
 
     .date {
-      font-size: 18px;
-      margin-top: 10px;
-      opacity: 0.9;
+      font-size: 20px;
+      margin-top: 16px;
+      font-weight: 500;
     }
 
     .weekday {
-      font-size: 14px;
-      margin-top: 5px;
-      opacity: 0.7;
+      font-size: 16px;
+      margin-top: 8px;
     }
   }
 }
 
-// 第二页：天气
+// 第二页：天气（单色适配）
 .page-weather {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: #fff;
+  color: #000;
 
   .weather-content {
     text-align: center;
-    color: #333;
+    color: #000;
+    font-family: 'Courier New', Consolas, monospace;
 
     .weather-icon .weather-emoji {
-      font-size: 64px;
+      font-size: 56px;
       line-height: 1;
     }
 
     .weather-temp {
-      font-size: 42px;
-      font-weight: 300;
+      font-size: 40px;
+      font-weight: 400;
     }
 
     .weather-desc {
@@ -565,7 +612,7 @@ onUnmounted(() => {
     .weather-detail {
       margin-top: 15px;
       font-size: 14px;
-      color: #666;
+      color: #000;
       display: flex;
       gap: 20px;
       justify-content: center;
@@ -575,7 +622,7 @@ onUnmounted(() => {
   .weather-loading,
   .weather-error {
     text-align: center;
-    color: #666;
+    color: #000;
 
     .el-icon {
       font-size: 24px;
@@ -584,18 +631,24 @@ onUnmounted(() => {
   }
 }
 
-// 第三页：随机图片
-.page-image {
-  background: #000;
+// 第三页：ASCII 艺术（单色适配）
+.page-ascii {
+  background: #fff;
+  color: #000;
+  padding: 10px;
 
-  .random-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  .ascii-art {
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 10px;
+    line-height: 1.1;
+    white-space: pre;
+    text-align: center;
+    margin: 0;
+    color: #000;
   }
 }
 
-// 页码指示器
+// 页码指示器（单色适配）
 .page-indicator {
   position: absolute;
   bottom: 10px;
@@ -608,17 +661,17 @@ onUnmounted(() => {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(0, 0, 0, 0.3);
     cursor: pointer;
     transition: all 0.3s ease;
 
     &.active {
-      background: #fff;
+      background: #000;
       transform: scale(1.2);
     }
 
     &:hover {
-      background: rgba(255, 255, 255, 0.8);
+      background: rgba(0, 0, 0, 0.6);
     }
   }
 }

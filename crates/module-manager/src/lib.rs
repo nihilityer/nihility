@@ -115,6 +115,10 @@ impl ModuleManager {
                             );
                         }
                         let module = Arc::new(RwLock::new(module));
+                        let monitor_module = module.clone();
+                        tokio::spawn(nihility_module_edge_device_control::monitor_task(
+                            monitor_module,
+                        ));
                         edge_device_control = Some(module.clone());
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
