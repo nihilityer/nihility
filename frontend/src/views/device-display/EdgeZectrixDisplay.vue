@@ -18,14 +18,6 @@
               />
             </el-form-item>
 
-            <el-form-item label="图片刷新间隔(秒)">
-              <el-input-number
-                  v-model="config.imageRefreshInterval"
-                  :max="3600"
-                  :min="5"
-              />
-            </el-form-item>
-
             <el-form-item>
               <el-button style="width: 100%" type="primary" @click="saveConfig">
                 保存配置
@@ -44,7 +36,6 @@
             <li>使用 <kbd>↑</kbd> <kbd>↓</kbd> 方向键翻页</li>
             <li>首页显示当前时间和日期</li>
             <li>第二页显示当地天气</li>
-            <li>第三页显示随机图片</li>
           </ul>
         </el-card>
       </el-aside>
@@ -88,21 +79,7 @@
               </div>
             </div>
 
-            <!-- 第三页：ASCII 艺术 -->
-            <div v-show="currentPage === 2" class="page page-ascii">
-              <pre class="ascii-art">{{ currentAsciiArt }}</pre>
             </div>
-          </div>
-
-          <!-- 页码指示器 -->
-          <div class="page-indicator">
-            <span
-                v-for="i in 3"
-                :key="i"
-                :class="['indicator-dot', { active: currentPage === i - 1 }]"
-                @click="goToPage(i - 1)"
-            />
-          </div>
         </div>
       </el-main>
     </el-container>
@@ -110,7 +87,7 @@
 </template>
 
 <script lang="ts" setup>
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {ElMessage} from 'element-plus'
 import {Loading} from '@element-plus/icons-vue'
 import {createModuleConfig, getModuleConfig, updateModuleConfig} from '@/api/moduleConfigs'
@@ -121,7 +98,6 @@ const MODULE_NAME = 'frontend_edge_zectrix_display'
 // 配置接口
 interface EdgeZectrixDisplayConfig {
   weatherCity: string
-  imageRefreshInterval: number
 }
 
 // 配置 Schema
@@ -132,14 +108,8 @@ const CONFIG_SCHEMA = {
       type: 'string',
       description: '天气城市名称',
     },
-    imageRefreshInterval: {
-      type: 'integer',
-      description: '图片刷新间隔(秒)',
-      minimum: 5,
-      maximum: 3600,
-    },
   },
-  required: ['weatherCity', 'imageRefreshInterval'],
+  required: ['weatherCity'],
 }
 
 // Open-Meteo 天气数据接口
@@ -161,7 +131,6 @@ interface OpenMeteoGeocoding {
 // 状态
 const config = ref<EdgeZectrixDisplayConfig>({
   weatherCity: '',
-  imageRefreshInterval: 30,
 })
 
 // 配置 ID
@@ -177,61 +146,8 @@ const weatherCityName = ref('')
 const weatherLoading = ref(false)
 const weatherError = ref(false)
 
-const currentImage = ref('')
-const imageLoading = ref(false)
-
-// ASCII 艺术图案库（适配单色显示）
-const asciiArtPatterns = [
-  `  .----.
-  / o  o \\
- |   <>   |
-  \\  ..  /
-   '----'`,
-  `    *    *
-   /|  |\\
-  / |  | \\
- *--*--*--*
-  \\ |  | /
-   \\|  |/
-    '**'`,
-  `  /\\
- /  \\
-/    \\
-| 机械 |
-| 之心 |
- \\____/`,
-  `  .------.
-  |  --   |
-  |  \\/   |
-  |       |
-  |_______|
-  '------'`,
-]
-
-const currentAsciiArt = ref('')
-
-// ASCII 艺术定时器
-let asciiInterval: ReturnType<typeof setInterval> | null = null
-
-// 更新 ASCII 艺术
-const updateAsciiArt = () => {
-  const randomIndex = Math.floor(Math.random() * asciiArtPatterns.length)
-  currentAsciiArt.value = asciiArtPatterns[randomIndex] ?? ''
-}
-
-// 设置 ASCII 艺术定时器
-const setupAsciiArtInterval = () => {
-  if (asciiInterval) {
-    clearInterval(asciiInterval)
-  }
-  updateAsciiArt()
-  asciiInterval = setInterval(updateAsciiArt, config.value.imageRefreshInterval * 1000)
-}
-
 // 时间更新定时器
 let timeInterval: ReturnType<typeof setInterval> | null = null
-// 图片刷新定时器
-let imageInterval: ReturnType<typeof setInterval> | null = null
 
 // WMO 天气代码到 ASCII 符号的映射（适配单色显示）
 const weatherCodeToIcon: Record<number, string> = {
@@ -423,13 +339,6 @@ const fetchWeather = async () => {
   }
 }
 
-// 获取随机图片
-const fetchRandomImage = () => {
-  // 使用 picsum.photos，添加时间戳避免缓存
-  const timestamp = Date.now()
-  currentImage.value = `https://picsum.photos/400/300?timestamp=${timestamp}`
-}
-
 // 键盘事件处理
 const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'ArrowUp') {
@@ -441,63 +350,24 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 // 翻页
 const prevPage = () => {
-  currentPage.value = (currentPage.value - 1 + 3) % 3
+  currentPage.value = (currentPage.value - 1 + 2) % 2
 }
 
 const nextPage = () => {
-  currentPage.value = (currentPage.value + 1) % 3
+  currentPage.value = (currentPage.value + 1) % 2
 }
-
-const goToPage = (page: number) => {
-  currentPage.value = page
-}
-
-// 图片加载完成
-const onImageLoad = () => {
-  imageLoading.value = false
-}
-
-// 图片加载失败
-const onImageError = () => {
-  // 尝试重新获取图片
-  fetchRandomImage()
-}
-
-// 设置定时器
-const setupIntervals = () => {
-  // 更新时间每秒
-  timeInterval = setInterval(updateTime, 1000)
-
-  // 更新图片定时器
-  if (imageInterval) {
-    clearInterval(imageInterval)
-  }
-  imageInterval = setInterval(fetchRandomImage, config.value.imageRefreshInterval * 1000)
-}
-
-// 监听配置变化
-watch(
-    () => config.value.imageRefreshInterval,
-    () => {
-      if (imageInterval) {
-        clearInterval(imageInterval)
-      }
-      imageInterval = setInterval(fetchRandomImage, config.value.imageRefreshInterval * 1000)
-    }
-)
 
 // 组件挂载
 onMounted(async () => {
   await loadConfig()
   updateTime()
-  fetchRandomImage()
 
   if (config.value.weatherCity) {
     fetchWeather()
   }
 
-  setupIntervals()
-  setupAsciiArtInterval()
+  // 更新时间每分钟（墨水屏不需要每秒刷新）
+  timeInterval = setInterval(updateTime, 60000)
 
   // 聚焦到展示容器以接收键盘事件
   const container = document.querySelector('.display-container') as HTMLElement
@@ -508,12 +378,6 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timeInterval) {
     clearInterval(timeInterval)
-  }
-  if (imageInterval) {
-    clearInterval(imageInterval)
-  }
-  if (asciiInterval) {
-    clearInterval(asciiInterval)
   }
 })
 </script>
@@ -669,51 +533,6 @@ onUnmounted(() => {
     .el-icon {
       font-size: 24px;
       margin-bottom: 10px;
-    }
-  }
-}
-
-// 第三页：ASCII 艺术（单色适配）
-.page-ascii {
-  background: #fff;
-  color: #000;
-  padding: 10px;
-
-  .ascii-art {
-    font-family: 'Courier New', Consolas, monospace;
-    font-size: 10px;
-    line-height: 1.1;
-    white-space: pre;
-    text-align: center;
-    margin: 0;
-    color: #000;
-  }
-}
-
-// 页码指示器（单色适配）
-.page-indicator {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 8px;
-
-  .indicator-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.3);
-    cursor: pointer;
-    transition: all 0.3s ease;
-
-    &.active {
-      background: #000;
-      transform: scale(1.2);
-    }
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.6);
     }
   }
 }
