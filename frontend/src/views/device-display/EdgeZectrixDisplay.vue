@@ -34,9 +34,10 @@
           </template>
           <ul class="help-list">
             <li>使用 <kbd>↑</kbd> <kbd>↓</kbd> 方向键翻页</li>
+            <li>每5分钟自动切换下一页</li>
             <li>首页显示当前时间和日期</li>
             <li>第二页显示当地天气</li>
-            <li>第三页显示未来7天天气预报</li>
+            <li>第三页显示未来3天天气预报</li>
           </ul>
         </el-card>
       </el-aside>
@@ -189,6 +190,8 @@ const forecastData = ref<DailyForecast[]>([])
 
 // 时间更新定时器
 let timeInterval: ReturnType<typeof setInterval> | null = null
+// 页面自动切换定时器
+let pageInterval: ReturnType<typeof setInterval> | null = null
 
 // WMO 天气代码到 Element Plus 图标名的映射
 const weatherCodeToIcon: Record<number, string> = {
@@ -439,6 +442,9 @@ onMounted(async () => {
   // 更新时间每分钟（墨水屏不需要每秒刷新）
   timeInterval = setInterval(updateTime, 60000)
 
+  // 每5分钟自动切换到下一页
+  pageInterval = setInterval(nextPage, 5 * 60 * 1000)
+
   // 聚焦到展示容器以接收键盘事件
   const container = document.querySelector('.display-container') as HTMLElement
   container?.focus()
@@ -448,6 +454,9 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timeInterval) {
     clearInterval(timeInterval)
+  }
+  if (pageInterval) {
+    clearInterval(pageInterval)
   }
 })
 </script>
