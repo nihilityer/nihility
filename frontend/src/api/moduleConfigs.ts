@@ -24,6 +24,12 @@ export interface ModuleConfigUpdateRequest {
     config_value: Record<string, any>
 }
 
+export interface ModuleConfigCreateRequest {
+    module_name: string
+    config_value: Record<string, any>
+    json_schema: Record<string, any>
+}
+
 export const listModuleConfigs = () => {
     return http.get<ModuleConfigListResponse>('/module-configs')
 }
@@ -34,4 +40,8 @@ export const getModuleConfig = (moduleName: string) => {
 
 export const updateModuleConfig = (id: string, data: ModuleConfigUpdateRequest) => {
     return http.put<ModuleConfig>(`/module-configs/id/${id}`, data)
+}
+
+export const createModuleConfig = (data: ModuleConfigCreateRequest) => {
+    return http.post<ModuleConfig>('/module-configs', data)
 }

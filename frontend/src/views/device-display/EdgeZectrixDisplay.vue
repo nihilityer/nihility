@@ -2,7 +2,7 @@
   <div class="edge-zectrix-display">
     <el-container>
       <!-- 左侧配置区域 -->
-      <el-aside width="300px" class="config-aside">
+      <el-aside class="config-aside" width="300px">
         <el-card class="config-card">
           <template #header>
             <div class="card-header">
@@ -10,24 +10,24 @@
             </div>
           </template>
 
-          <el-form :model="config" label-width="100px" label-position="top">
+          <el-form :model="config" label-position="top" label-width="100px">
             <el-form-item label="天气城市">
               <el-input
-                v-model="config.weatherCity"
-                placeholder="例如: Beijing, Shanghai"
+                  v-model="config.weatherCity"
+                  placeholder="例如: Beijing, Shanghai"
               />
             </el-form-item>
 
             <el-form-item label="图片刷新间隔(秒)">
               <el-input-number
-                v-model="config.imageRefreshInterval"
-                :min="5"
-                :max="3600"
+                  v-model="config.imageRefreshInterval"
+                  :max="3600"
+                  :min="5"
               />
             </el-form-item>
 
             <el-form-item>
-              <el-button type="primary" @click="saveConfig" style="width: 100%">
+              <el-button style="width: 100%" type="primary" @click="saveConfig">
                 保存配置
               </el-button>
             </el-form-item>
@@ -77,7 +77,9 @@
                 </div>
               </div>
               <div v-else-if="weatherLoading" class="weather-loading">
-                <el-icon class="is-loading"><Loading /></el-icon>
+                <el-icon class="is-loading">
+                  <Loading/>
+                </el-icon>
                 <span>加载天气中...</span>
               </div>
               <div v-else class="weather-error">
@@ -95,10 +97,10 @@
           <!-- 页码指示器 -->
           <div class="page-indicator">
             <span
-              v-for="i in 3"
-              :key="i"
-              :class="['indicator-dot', { active: currentPage === i - 1 }]"
-              @click="goToPage(i - 1)"
+                v-for="i in 3"
+                :key="i"
+                :class="['indicator-dot', { active: currentPage === i - 1 }]"
+                @click="goToPage(i - 1)"
             />
           </div>
         </div>
@@ -108,14 +110,36 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {ElMessage} from 'element-plus'
+import {Loading} from '@element-plus/icons-vue'
+import {createModuleConfig, getModuleConfig, updateModuleConfig} from '@/api/moduleConfigs'
+
+// 模块名称前缀
+const MODULE_NAME = 'frontend_edge_zectrix_display'
 
 // 配置接口
 interface EdgeZectrixDisplayConfig {
   weatherCity: string
   imageRefreshInterval: number
+}
+
+// 配置 Schema
+const CONFIG_SCHEMA = {
+  type: 'object',
+  properties: {
+    weatherCity: {
+      type: 'string',
+      description: '天气城市名称',
+    },
+    imageRefreshInterval: {
+      type: 'integer',
+      description: '图片刷新间隔(秒)',
+      minimum: 5,
+      maximum: 3600,
+    },
+  },
+  required: ['weatherCity', 'imageRefreshInterval'],
 }
 
 // Open-Meteo 天气数据接口
@@ -134,14 +158,14 @@ interface OpenMeteoGeocoding {
   }>
 }
 
-// localStorage key
-const STORAGE_KEY = 'edge_zectrix_display_config'
-
 // 状态
 const config = ref<EdgeZectrixDisplayConfig>({
   weatherCity: '',
   imageRefreshInterval: 30,
 })
+
+// 配置 ID
+const configId = ref<string>('')
 
 const currentPage = ref(0)
 const currentTime = ref('')
@@ -305,24 +329,42 @@ const updateTime = () => {
 }
 
 // 加载配置
-const loadConfig = () => {
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored) {
+const loadConfig = async () => {
+  try {
+    const moduleConfig = await getModuleConfig(MODULE_NAME)
+    config.value = {...config.value, ...moduleConfig.data.config_value as EdgeZectrixDisplayConfig}
+    configId.value = moduleConfig.data.id
+  } catch {
+    // 配置不存在，创建默认配置
     try {
-      config.value = { ...config.value, ...JSON.parse(stored) }
+      const newConfig = await createModuleConfig({
+        module_name: MODULE_NAME,
+        config_value: config.value,
+        json_schema: CONFIG_SCHEMA,
+      })
+      configId.value = newConfig.data.id
     } catch (e) {
-      console.error('Failed to load config:', e)
+      console.error('Failed to create config:', e)
     }
   }
 }
 
 // 保存配置
-const saveConfig = () => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config.value))
-  ElMessage.success('配置已保存')
-  // 刷新天气数据
-  if (config.value.weatherCity) {
-    fetchWeather()
+const saveConfig = async () => {
+  if (!configId.value) {
+    ElMessage.error('配置未加载')
+    return
+  }
+  try {
+    await updateModuleConfig(configId.value, {config_value: config.value})
+    ElMessage.success('配置已保存')
+    // 刷新天气数据
+    if (config.value.weatherCity) {
+      fetchWeather()
+    }
+  } catch (e) {
+    console.error('Failed to save config:', e)
+    ElMessage.error('保存配置失败')
   }
 }
 
@@ -339,7 +381,7 @@ const fetchWeather = async () => {
   try {
     // 首先通过地理编码 API 获取城市坐标
     const geocodingResponse = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(config.value.weatherCity)}&count=1`
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(config.value.weatherCity)}&count=1`
     )
 
     if (!geocodingResponse.ok) {
@@ -354,12 +396,12 @@ const fetchWeather = async () => {
     }
 
     const location = results[0]!
-    const { latitude, longitude, name, country } = location
+    const {latitude, longitude, name, country} = location
     weatherCityName.value = `${name}, ${country}`
 
     // 获取天气数据
     const weatherResponse = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m`
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m`
     )
 
     if (!weatherResponse.ok) {
@@ -435,18 +477,18 @@ const setupIntervals = () => {
 
 // 监听配置变化
 watch(
-  () => config.value.imageRefreshInterval,
-  () => {
-    if (imageInterval) {
-      clearInterval(imageInterval)
+    () => config.value.imageRefreshInterval,
+    () => {
+      if (imageInterval) {
+        clearInterval(imageInterval)
+      }
+      imageInterval = setInterval(fetchRandomImage, config.value.imageRefreshInterval * 1000)
     }
-    imageInterval = setInterval(fetchRandomImage, config.value.imageRefreshInterval * 1000)
-  }
 )
 
 // 组件挂载
-onMounted(() => {
-  loadConfig()
+onMounted(async () => {
+  await loadConfig()
   updateTime()
   fetchRandomImage()
 

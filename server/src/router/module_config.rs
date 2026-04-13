@@ -2,7 +2,7 @@ use crate::error::*;
 use crate::router::not_found;
 use crate::AppState;
 use axum::extract::{Path, State};
-use axum::routing::{get, put};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use chrono::{DateTime, FixedOffset};
 use nihility_store_operate::module_config;
@@ -13,6 +13,7 @@ use uuid::Uuid;
 pub fn module_config_router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_configs))
+        .route("/", post(create_config))
         .route("/{module_name}", get(get_config_by_module_name))
         .route("/id/{id}", put(update_config))
         .fallback(not_found)
@@ -48,6 +49,14 @@ pub struct ModuleConfigResponse {
 #[derive(Debug, Deserialize)]
 pub struct ModuleConfigUpdateRequest {
     pub config_value: Value,
+}
+
+/// 模块配置创建请求
+#[derive(Debug, Deserialize)]
+pub struct ModuleConfigCreateRequest {
+    pub module_name: String,
+    pub config_value: Value,
+    pub json_schema: Value,
 }
 
 /// 获取所有模块配置列表
@@ -94,6 +103,48 @@ pub async fn update_config(
     Json(request): Json<ModuleConfigUpdateRequest>,
 ) -> Result<Json<ModuleConfigResponse>> {
     let config = module_config::update_config_value(&state.conn, &id, request.config_value).await?;
+
+    Ok(Json(ModuleConfigResponse {
+        id: config.id,
+        module_name: config.module_name,
+        config_value: config.config_value,
+        json_schema: config.json_schema,
+        created_at: config.created_at,
+        updated_at: config.updated_at,
+    }))
+}
+
+/// 创建新模块配置（如果已存在则返回已存在的配置）
+pub async fn create_config(
+    State(state): State<AppState>,
+    Json(request): Json<ModuleConfigCreateRequest>,
+) -> Result<Json<ModuleConfigResponse>> {
+    // 先检查是否已存在
+    let existing = module_config::find_by_module_name(&state.conn, &request.module_name).await;
+
+    if let Ok(config) = existing {
+        // 已存在，直接返回
+        return Ok(Json(ModuleConfigResponse {
+            id: config.id,
+            module_name: config.module_name,
+            config_value: config.config_value,
+            json_schema: config.json_schema,
+            created_at: config.created_at,
+            updated_at: config.updated_at,
+        }));
+    }
+
+    // 不存在，创建新配置
+    module_config::upsert(
+        &state.conn,
+        &request.module_name,
+        request.config_value,
+        request.json_schema,
+    )
+    .await?;
+
+    // 重新获取刚创建的配置
+    let config = module_config::find_by_module_name(&state.conn, &request.module_name).await?;
 
     Ok(Json(ModuleConfigResponse {
         id: config.id,
