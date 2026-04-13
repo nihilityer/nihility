@@ -36,6 +36,7 @@
             <li>使用 <kbd>↑</kbd> <kbd>↓</kbd> 方向键翻页</li>
             <li>首页显示当前时间和日期</li>
             <li>第二页显示当地天气</li>
+            <li>第三页显示未来7天天气预报</li>
           </ul>
         </el-card>
       </el-aside>
@@ -58,7 +59,9 @@
             <div v-show="currentPage === 1" class="page page-weather">
               <div v-if="weatherData" class="weather-content">
                 <div class="weather-icon">
-                  <span class="weather-emoji">{{ weatherIcon }}</span>
+                  <el-icon :size="56">
+                    <component :is="weatherIconComponent"/>
+                  </el-icon>
                 </div>
                 <div class="weather-temp">{{ weatherData.temperature }}°C</div>
                 <div class="weather-desc">{{ weatherDescription }}</div>
@@ -79,7 +82,26 @@
               </div>
             </div>
 
+            <!-- 第三页：3天天气预报 -->
+            <div v-show="currentPage === 2" class="page page-forecast">
+              <div class="forecast-content">
+                <h3 class="forecast-title">3天天气预报</h3>
+                <div class="forecast-list">
+                  <div v-for="day in forecastData.slice(0, 3)" :key="day.dateRaw" class="forecast-item">
+                    <div class="forecast-day">{{ day.date }}</div>
+                    <el-icon class="forecast-icon">
+                      <component :is="iconMap[day.icon]"/>
+                    </el-icon>
+                    <div class="forecast-temps">
+                      <span class="temp-max">{{ day.tempMax }}°</span>
+                      <span class="temp-min">{{ day.tempMin }}°</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+
+          </div>
         </div>
       </el-main>
     </el-container>
@@ -89,7 +111,7 @@
 <script lang="ts" setup>
 import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {ElMessage} from 'element-plus'
-import {Loading} from '@element-plus/icons-vue'
+import {Cloudy, ColdDrink, Drizzling, Lightning, Loading, PartlyCloudy, Pouring, Sunny} from '@element-plus/icons-vue'
 import {createModuleConfig, getModuleConfig, updateModuleConfig} from '@/api/moduleConfigs'
 
 // 模块名称前缀
@@ -128,6 +150,24 @@ interface OpenMeteoGeocoding {
   }>
 }
 
+// Open-Meteo 每日预报数据接口
+interface OpenMeteoDailyForecast {
+  time: string[]
+  weather_code: number[]
+  temperature_2m_max: number[]
+  temperature_2m_min: number[]
+}
+
+// 每日天气预报项
+interface DailyForecast {
+  date: string
+  dateRaw: string
+  icon: string
+  description: string
+  tempMax: number
+  tempMin: number
+}
+
 // 状态
 const config = ref<EdgeZectrixDisplayConfig>({
   weatherCity: '',
@@ -145,40 +185,41 @@ const weatherData = ref<OpenMeteoWeather | null>(null)
 const weatherCityName = ref('')
 const weatherLoading = ref(false)
 const weatherError = ref(false)
+const forecastData = ref<DailyForecast[]>([])
 
 // 时间更新定时器
 let timeInterval: ReturnType<typeof setInterval> | null = null
 
-// WMO 天气代码到 ASCII 符号的映射（适配单色显示）
+// WMO 天气代码到 Element Plus 图标名的映射
 const weatherCodeToIcon: Record<number, string> = {
-  0: '*',   // 晴朗
-  1: '*',   // 大部晴朗
-  2: '~',   // 部分多云
-  3: '~',   // 阴天
-  45: '=',  // 雾
-  48: '=',  // 雾凇
-  51: '#',  // 小毛毛雨
-  53: '#',  // 中毛毛雨
-  55: '#',  // 大毛毛雨
-  56: '#',  // 冻毛毛雨
-  57: '#',  // 冻毛毛雨
-  61: '#',  // 小雨
-  63: '#',  // 中雨
-  65: '#',  // 大雨
-  66: '#',  // 冻雨
-  67: '#',  // 冻雨
-  71: '*',  // 小雪
-  73: '*',  // 中雪
-  75: '*',  // 大雪
-  77: '*',  // 雪粒
-  80: '#',  // 小阵雨
-  81: '#',  // 中阵雨
-  82: '#',  // 大阵雨
-  85: '*',  // 小阵雪
-  86: '*',  // 大阵雪
-  95: '#',  // 雷暴
-  96: '#',  // 雷暴伴小冰雹
-  99: '#',  // 雷暴伴大冰雹
+  0: 'Sunny',           // 晴朗
+  1: 'Sunny',           // 大部晴朗
+  2: 'PartlyCloudy',    // 部分多云
+  3: 'Cloudy',          // 阴天
+  45: 'Cloudy',         // 雾
+  48: 'Cloudy',         // 雾凇
+  51: 'Drizzling',      // 小毛毛雨
+  53: 'Drizzling',      // 中毛毛雨
+  55: 'Drizzling',      // 大毛毛雨
+  56: 'Drizzling',      // 冻毛毛雨
+  57: 'Drizzling',      // 冻毛毛雨
+  61: 'Drizzling',      // 小雨
+  63: 'Pouring',        // 中雨
+  65: 'Pouring',        // 大雨
+  66: 'Drizzling',      // 冻雨
+  67: 'Pouring',        // 冻雨
+  71: 'ColdDrink',      // 小雪
+  73: 'ColdDrink',      // 中雪
+  75: 'ColdDrink',      // 大雪
+  77: 'ColdDrink',      // 雪粒
+  80: 'Pouring',        // 小阵雨
+  81: 'Pouring',        // 中阵雨
+  82: 'Pouring',        // 大阵雨
+  85: 'ColdDrink',      // 小阵雪
+  86: 'ColdDrink',      // 大阵雪
+  95: 'Lightning',      // 雷暴
+  96: 'Lightning',      // 雷暴伴小冰雹
+  99: 'Lightning',      // 雷暴伴大冰雹
 }
 
 // WMO 天气代码到中文描述的映射
@@ -213,11 +254,22 @@ const weatherCodeToDescription: Record<number, string> = {
   99: '雷暴伴大冰雹',
 }
 
-// 天气 Emoji 图标
-const weatherIcon = computed(() => {
-  if (!weatherData.value) return ''
-  const icon = weatherCodeToIcon[weatherData.value.weathercode]
-  return icon || weatherCodeToIcon[0]
+// 天气图标组件映射
+const iconMap: Record<string, any> = {
+  Sunny,
+  PartlyCloudy,
+  Cloudy,
+  Drizzling,
+  Pouring,
+  Lightning,
+  ColdDrink,
+}
+
+// 天气图标组件
+const weatherIconComponent = computed(() => {
+  if (!weatherData.value) return Sunny
+  const iconName = weatherCodeToIcon[weatherData.value.weathercode] || 'Sunny'
+  return iconMap[iconName] || Sunny
 })
 
 // 天气描述
@@ -317,7 +369,7 @@ const fetchWeather = async () => {
 
     // 获取天气数据
     const weatherResponse = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m`
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`
     )
 
     if (!weatherResponse.ok) {
@@ -330,6 +382,22 @@ const fetchWeather = async () => {
       windspeed: weatherResult.current.wind_speed_10m,
       weathercode: weatherResult.current.weather_code,
     }
+
+    // 解析每日预报数据
+    const daily = weatherResult.daily as OpenMeteoDailyForecast
+    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+    forecastData.value = daily.time.map((dateStr, index) => {
+      const date = new Date(dateStr)
+      const weatherCode = daily.weather_code[index] ?? 0
+      return {
+        date: weekdays[date.getDay()] ?? '',
+        dateRaw: dateStr,
+        icon: weatherCodeToIcon[weatherCode] || 'Sunny',
+        description: weatherCodeToDescription[weatherCode] || '未知',
+        tempMax: daily.temperature_2m_max[index] ?? 0,
+        tempMin: daily.temperature_2m_min[index] ?? 0,
+      }
+    })
   } catch (e) {
     console.error('Failed to fetch weather:', e)
     weatherError.value = true
@@ -349,12 +417,14 @@ const handleKeyDown = (e: KeyboardEvent) => {
 }
 
 // 翻页
+const TOTAL_PAGES = 3
+
 const prevPage = () => {
-  currentPage.value = (currentPage.value - 1 + 2) % 2
+  currentPage.value = (currentPage.value - 1 + TOTAL_PAGES) % TOTAL_PAGES
 }
 
 const nextPage = () => {
-  currentPage.value = (currentPage.value + 1) % 2
+  currentPage.value = (currentPage.value + 1) % TOTAL_PAGES
 }
 
 // 组件挂载
@@ -533,6 +603,77 @@ onUnmounted(() => {
     .el-icon {
       font-size: 24px;
       margin-bottom: 10px;
+    }
+  }
+}
+
+// 第三页：3天预报
+.page-forecast {
+  background: #fff;
+  color: #000;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  .forecast-content {
+    text-align: center;
+    font-family: 'Courier New', Consolas, monospace;
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .forecast-title {
+    font-size: 28px;
+    margin-bottom: 24px;
+  }
+
+  .forecast-list {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    flex: 1;
+  }
+
+  .forecast-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 1;
+    padding: 0 16px;
+    border-right: 1px solid #ccc;
+
+    &:last-child {
+      border-right: none;
+    }
+
+    .forecast-day {
+      font-weight: 500;
+      font-size: 24px;
+    }
+
+    .forecast-icon {
+      font-size: 48px;
+    }
+
+    .forecast-temps {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 24px;
+
+      .temp-max {
+        color: #000;
+      }
+
+      .temp-min {
+        color: #666;
+      }
     }
   }
 }
