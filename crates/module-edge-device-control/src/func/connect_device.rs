@@ -1,9 +1,14 @@
+use crate::device::Device;
 use crate::error::*;
 use crate::EdgeDeviceControl;
 use nihility_module_browser_control::func::close_page::ClosePageParam;
 use nihility_module_browser_control::func::open_page::OpenPageParam;
+use nihility_module_browser_control::BrowserControl;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::info;
 
 /// 连接新设备
@@ -24,57 +29,66 @@ impl EdgeDeviceControl {
                 "browser_control is required".to_string(),
             ));
         }
-
-        let mut devices_guard = self.devices.write().await;
-        let device = devices_guard.get_mut(&param.device_id).ok_or_else(|| {
-            EdgeDeviceControlError::DeviceStatus(format!("device {} not found", param.device_id))
-        })?;
-
-        if let Some(task) = &device.screen_refresh_task {
-            task.abort();
-        }
-        if let Some(task) = &device.key_handle_task {
-            task.abort();
-        }
-        if let Some(page_id) = device.page_id {
-            self.browser_control
-                .as_ref()
-                .unwrap()
-                .write()
-                .await
-                .close_page(ClosePageParam { page_id })
-                .await?;
-        }
-
-        let page_id = self
-            .browser_control
-            .as_ref()
-            .unwrap()
-            .write()
-            .await
-            .open_page(OpenPageParam {
-                url: param.mapping_url.to_string(),
-            })
-            .await?;
-        device.page_id = Some(page_id);
-        info!(
-            "connect to device {} with page id: {}",
-            param.device_id, page_id
-        );
-        // 等待几秒让页面加载完成
-        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-        device
-            .start_screen_push(
-                self.devices.clone(),
-                self.browser_control.as_ref().unwrap().clone(),
-                page_id,
-                param.screenshot_selector,
-            )
-            .await?;
-        device
-            .start_key_handle(self.browser_control.as_ref().unwrap().clone(), page_id)
-            .await?;
+        connect_device(
+            param.device_id,
+            param.mapping_url,
+            param.screenshot_selector,
+            self.devices.clone(),
+            self.browser_control.as_ref().unwrap().clone(),
+        )
+        .await?;
         Ok(())
     }
+}
+
+pub async fn connect_device(
+    device_id: String,
+    mapping_url: String,
+    screenshot_selector: Option<String>,
+    devices: Arc<RwLock<HashMap<String, Device>>>,
+    browser_control: Arc<RwLock<BrowserControl>>,
+) -> Result<()> {
+    let mut devices_guard = devices.write().await;
+    let device = devices_guard.get_mut(&device_id).ok_or_else(|| {
+        EdgeDeviceControlError::DeviceStatus(format!("device {} not found", device_id))
+    })?;
+
+    if let Some(task) = &device.screen_refresh_task {
+        task.abort();
+    }
+    if let Some(task) = &device.key_handle_task {
+        task.abort();
+    }
+    if let Some(page_id) = device.page_id {
+        browser_control
+            .write()
+            .await
+            .close_page(ClosePageParam { page_id })
+            .await?;
+    }
+
+    let page_id = browser_control
+        .write()
+        .await
+        .open_page(OpenPageParam {
+            url: mapping_url.to_string(),
+        })
+        .await?;
+    device.page_id = Some(page_id);
+    info!("connect to device {} with page id: {}", device_id, page_id);
+    // 等待几秒让页面加载完成
+    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+    device
+        .start_screen_push(
+            devices.clone(),
+            browser_control.clone(),
+            page_id,
+            screenshot_selector,
+        )
+        .await?;
+    device
+        .start_key_handle(browser_control.clone(), page_id)
+        .await?;
+    Ok(())
 }

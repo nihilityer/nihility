@@ -1,25 +1,24 @@
 use crate::device::task::audio_handle::start_audio_handle;
 use crate::device::{start_message_handle, Device};
 use crate::error::*;
+use crate::func::connect_device;
 use axum::extract::ws::{Message, WebSocket};
+use nihility_module_browser_control::BrowserControl;
 use nihility_module_model::Model;
 use nihility_util_vad::{start_vad, VoiceActivityDetectionConfig};
 use postcard::from_bytes;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 pub(crate) async fn register_device(
     mut web_socket: WebSocket,
-    model: Option<Arc<RwLock<Model>>>,
+    model: Arc<RwLock<Model>>,
     devices: Arc<RwLock<HashMap<String, Device>>>,
+    browser_control: Arc<RwLock<BrowserControl>>,
+    auto_connect: Arc<HashMap<String, (String, Option<String>)>>,
 ) -> Result<()> {
-    if model.is_none() {
-        return Err(EdgeDeviceControlError::DeviceStatus(
-            "Model module not set".to_string(),
-        ));
-    }
     let mut device = None;
     // 接受来自设备的信息后注册新设备
     while let Some(Ok(msg)) = web_socket.recv().await {
@@ -50,9 +49,7 @@ pub(crate) async fn register_device(
             _ => {}
         }
     }
-    if let Some(mut device) = device
-        && let Some(model) = model
-    {
+    if let Some(mut device) = device {
         debug!("register device: {}", device.info.device_id);
         let config = nihility_config::get_config::<VoiceActivityDetectionConfig>(&format!(
             "device_{}_vad",
@@ -74,10 +71,26 @@ pub(crate) async fn register_device(
         )
         .await?;
         device.ws_sender = Some(ws_sender);
-        devices
-            .write()
-            .await
-            .insert(device.info.device_id.clone(), device);
+        let device_id = device.info.device_id.clone();
+        devices.write().await.insert(device_id.clone(), device);
+
+        if let Some((url, selector)) = auto_connect.get(&device_id) {
+            let devices_clone = devices.clone();
+            let device_id_clone = device_id.clone();
+            let url_clone = url.clone();
+            let selector_clone = selector.clone();
+            info!(
+                "auto-connecting device {} to {}",
+                device_id_clone, url_clone
+            );
+            tokio::spawn(connect_device(
+                device_id_clone,
+                url_clone,
+                selector_clone,
+                devices_clone,
+                browser_control,
+            ));
+        }
     }
     Ok(())
 }

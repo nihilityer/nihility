@@ -18,12 +18,26 @@ use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tracing::{error, info, warn};
 
+/// 自动连接设备配置
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AutoConnectDevice {
+    /// 设备Id
+    pub device_id: String,
+    /// 需要显示在设备屏幕上的网页Url
+    pub mapping_url: String,
+    /// 屏幕映射网页中哪个元素
+    pub screenshot_selector: Option<String>,
+}
+
 /// 边缘设备控制模块配置
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct EdgeDeviceControlConfig {
     /// 设备注册超时时间（秒），默认30秒
     #[serde(default = "default_register_timeout")]
     pub register_timeout_secs: usize,
+    /// 自动连接设备配置列表
+    #[serde(default)]
+    pub auto_connect: Vec<AutoConnectDevice>,
 }
 
 pub struct EdgeDeviceControl {
@@ -33,6 +47,7 @@ pub struct EdgeDeviceControl {
     model: Option<Arc<RwLock<Model>>>,
     web_socket_receive_task: Option<JoinHandle<Result<()>>>,
     register_timeout_secs: usize,
+    auto_connect: Arc<HashMap<String, (String, Option<String>)>>,
 }
 
 impl EdgeDeviceControl {
@@ -45,30 +60,53 @@ impl EdgeDeviceControl {
 
     pub async fn init(config: EdgeDeviceControlConfig) -> Result<Self> {
         let devices = Arc::new(RwLock::new(HashMap::new()));
-        let mut module = EdgeDeviceControl {
+        let auto_connect: HashMap<String, (String, Option<String>)> = config
+            .auto_connect
+            .iter()
+            .map(|ac| {
+                (
+                    ac.device_id.clone(),
+                    (ac.mapping_url.clone(), ac.screenshot_selector.clone()),
+                )
+            })
+            .collect();
+        let module = EdgeDeviceControl {
             web_socket_sender: None,
             devices,
             browser_control: None,
             model: None,
             web_socket_receive_task: None,
             register_timeout_secs: config.register_timeout_secs,
+            auto_connect: Arc::new(auto_connect),
         };
-        module.start_register_device().await?;
         Ok(module)
     }
 
     pub async fn start_register_device(&mut self) -> Result<()> {
+        if self.model.is_none() || self.browser_control.is_none() {
+            return Err(EdgeDeviceControlError::DeviceStatus(
+                "Module model and browser_control is required".to_string(),
+            ));
+        }
         let (web_socket_sender, mut web_socket_receiver) = mpsc::unbounded_channel::<WebSocket>();
 
         let web_socket_devices = self.devices.clone();
         let register_timeout_secs = self.register_timeout_secs;
-        let model = self.model.clone();
+        let model = self.model.as_ref().unwrap().clone();
+        let browser_control = self.browser_control.as_ref().unwrap().clone();
+        let auto_connect = self.auto_connect.clone();
         let web_socket_receive_task = tokio::spawn(async move {
             info!("Starting web socket receiver");
             while let Some(web_socket) = web_socket_receiver.recv().await {
                 match timeout(
                     Duration::from_secs(register_timeout_secs as u64),
-                    register_device(web_socket, model.clone(), web_socket_devices.clone()),
+                    register_device(
+                        web_socket,
+                        model.clone(),
+                        web_socket_devices.clone(),
+                        browser_control.clone(),
+                        auto_connect.clone(),
+                    ),
                 )
                 .await
                 {
@@ -108,8 +146,6 @@ impl EdgeDeviceControl {
     /// 设置模型模块引用
     pub async fn set_model(&mut self, model: Arc<RwLock<Model>>) -> Result<()> {
         self.model = Some(model);
-        self.stop_register_devices()?;
-        self.start_register_device().await?;
         Ok(())
     }
 
@@ -133,6 +169,7 @@ impl Default for EdgeDeviceControlConfig {
     fn default() -> Self {
         Self {
             register_timeout_secs: default_register_timeout(),
+            auto_connect: Vec::new(),
         }
     }
 }

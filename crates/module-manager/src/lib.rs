@@ -114,6 +114,7 @@ impl ModuleManager {
                                 embed_module
                             );
                         }
+                        module.start_register_device().await?;
                         let module = Arc::new(RwLock::new(module));
                         let monitor_module = module.clone();
                         tokio::spawn(nihility_module_edge_device_control::monitor_task(

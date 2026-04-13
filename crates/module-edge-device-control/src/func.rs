@@ -9,6 +9,7 @@ mod list_devices;
 
 use crate::func::connect_device::ConnectDeviceParam;
 use crate::func::list_devices::ListDevicesParam;
+pub use connect_device::connect_device;
 
 #[async_trait::async_trait]
 impl Callable for EdgeDeviceControl {
