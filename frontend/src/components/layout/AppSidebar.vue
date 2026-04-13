@@ -1,13 +1,18 @@
 <script lang="ts" setup>
 import {computed} from 'vue'
-import {useRoute} from 'vue-router'
+import {useRoute, useRouter} from 'vue-router'
 import {useLayoutStore} from '@/stores/layout'
-import {Document, Grid, HomeFilled, Setting} from '@element-plus/icons-vue'
+import {Document, Grid, HomeFilled, Monitor, Setting} from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const layoutStore = useLayoutStore()
 
 const activeMenu = computed(() => route.path)
+
+const goToDeviceDisplay = () => {
+  router.push('/device-display')
+}
 </script>
 
 <template>
@@ -48,6 +53,20 @@ const activeMenu = computed(() => route.path)
         </el-icon>
         <template #title>HTML 页面管理</template>
       </el-menu-item>
+      <el-sub-menu index="device-display">
+        <template #title>
+          <el-icon>
+            <Monitor/>
+          </el-icon>
+          <span class="sub-menu-title" @click="goToDeviceDisplay">设备展示</span>
+        </template>
+        <el-menu-item index="/device-display/edge-zectrix">
+          <el-icon>
+            <Monitor/>
+          </el-icon>
+          <template #title>ZecTrix 设备</template>
+        </el-menu-item>
+      </el-sub-menu>
     </el-menu>
   </div>
 </template>

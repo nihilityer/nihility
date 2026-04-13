@@ -1,6 +1,7 @@
 import type {RouteRecordRaw} from 'vue-router'
 import {createRouter, createWebHashHistory} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
+import {login} from '@/api/auth'
 
 const routes: RouteRecordRaw[] = [
     {
@@ -33,6 +34,18 @@ const routes: RouteRecordRaw[] = [
                 meta: {title: 'HTML 页面管理', icon: 'Document', requiresAuth: true},
             },
             {
+                path: 'device-display',
+                name: 'DeviceDisplay',
+                component: () => import('@/views/device-display/index.vue'),
+                meta: {title: '设备展示', icon: 'Monitor', requiresAuth: true},
+            },
+            {
+                path: 'device-display/edge-zectrix',
+                name: 'EdgeZectrixDisplay',
+                component: () => import('@/views/device-display/EdgeZectrixDisplay.vue'),
+                meta: {title: 'ZecTrix 设备', icon: 'Monitor', requiresAuth: true},
+            },
+            {
                 path: 'login',
                 name: 'Login',
                 component: () => import('@/views/Login.vue'),
@@ -48,7 +61,7 @@ const router = createRouter({
 })
 
 // 路由守卫 - 检查 token
-router.beforeEach((to, _from) => {
+router.beforeEach(async (to, _from) => {
     const authStore = useAuthStore()
 
     // 检查 URL 中是否带有 token 参数
@@ -67,6 +80,31 @@ router.beforeEach((to, _from) => {
             query,
             hash: to.hash,
             replace: true, // 替换历史记录，避免后退时重新处理 token
+        }
+    }
+
+    // 检查 URL 中是否带有 username 和 password 参数
+    const usernameParam = to.query.username as string | undefined
+    const passwordParam = to.query.password as string | undefined
+    if (usernameParam && passwordParam) {
+        try {
+            const response = await login({username: usernameParam, password: passwordParam})
+            authStore.setToken(response.access_token)
+
+            // 从 URL 中移除敏感参数
+            const query = {...to.query}
+            delete query.username
+            delete query.password
+
+            return {
+                path: to.path,
+                query,
+                hash: to.hash,
+                replace: true,
+            }
+        } catch {
+            // 登录失败，跳转到登录页
+            return '/login'
         }
     }
 
