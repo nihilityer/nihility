@@ -1,6 +1,7 @@
 use crate::func::close_page::ClosePageParam;
 use crate::func::open_page::OpenPageParam;
 use crate::func::press_key::PressKeyParam;
+use crate::func::refresh_page::RefreshPageParam;
 use crate::func::screenshot::ScreenshotParam;
 use crate::BrowserControl;
 use nihility_module::{BoxStream, Callable, FunctionMetadata, Module};
@@ -11,6 +12,7 @@ use tracing::debug;
 pub mod close_page;
 pub mod open_page;
 pub mod press_key;
+pub mod refresh_page;
 pub mod screenshot;
 
 #[async_trait::async_trait]
@@ -44,6 +46,9 @@ impl Callable for BrowserControl {
             )?),
             "press_key" => Ok(serde_json::to_value(
                 self.press_key(serde_json::from_value(param)?).await?,
+            )?),
+            "refresh_page" => Ok(serde_json::to_value(
+                self.refresh_page(serde_json::from_value(param)?).await?,
             )?),
             _ => Err(anyhow::anyhow!("Unsupported func_name")),
         }
@@ -99,6 +104,13 @@ impl Module for BrowserControl {
                 tags: vec![],
                 params: serde_json::to_value(schema_for!(PressKeyParam))
                     .expect("browser control func press_key build param"),
+            },
+            FunctionMetadata {
+                name: "refresh_page".to_string(),
+                desc: "刷新网页".to_string(),
+                tags: vec![],
+                params: serde_json::to_value(schema_for!(RefreshPageParam))
+                    .expect("browser control func refresh_page build param"),
             },
         ]
     }
