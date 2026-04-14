@@ -1,0 +1,21 @@
+[package]
+name = "nihility-util-init"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+readme.workspace = true
+keywords.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[dependencies]
+hf-hub = { workspace = true }
+thiserror = { workspace = true }
+chromiumoxide_fetcher = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+nihility-log = { workspace = true }

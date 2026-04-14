@@ -541,7 +541,7 @@ onUnmounted(() => {
 
   .datetime-content {
     text-align: center;
-    font-family: 'Courier New', Consolas, monospace;
+    font-family: 'Unifont', monospace;
 
     .time {
       font-size: 64px;
@@ -570,7 +570,7 @@ onUnmounted(() => {
   .weather-content {
     text-align: center;
     color: #000;
-    font-family: 'Courier New', Consolas, monospace;
+    font-family: 'Unifont', monospace;
 
     .weather-icon .weather-emoji {
       font-size: 56px;
@@ -627,7 +627,7 @@ onUnmounted(() => {
 
   .forecast-content {
     text-align: center;
-    font-family: 'Courier New', Consolas, monospace;
+    font-family: 'Unifont', monospace;
     padding: 20px;
     height: 100%;
     display: flex;

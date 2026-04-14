@@ -72,7 +72,6 @@ impl Default for MessagePoolConfig {
 
 /// 消息内容枚举
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(tag = "type", content = "data")]
 pub enum ContentData {
     /// 文本消息
     Text {
@@ -83,30 +82,16 @@ pub enum ContentData {
     Audio {
         /// 音频数据（URL 或 Base64）
         source: String,
-        /// 时长（秒）
-        duration: Option<f64>,
-        /// 采样率
-        sample_rate: Option<u32>,
     },
     /// 图片消息
     Image {
         /// 图片数据（URL 或 Base64）
         source: String,
-        /// 宽度
-        width: Option<u32>,
-        /// 高度
-        height: Option<u32>,
     },
     /// 视频消息
     Video {
         /// 视频数据（URL 或 Base64）
         source: String,
-        /// 时长（秒）
-        duration: Option<f64>,
-        /// 宽度
-        width: Option<u32>,
-        /// 高度
-        height: Option<u32>,
     },
 }
 
@@ -163,13 +148,6 @@ pub struct MessagePool {
 }
 
 impl MessagePool {
-    /// 从配置文件初始化
-    pub async fn init_from_file_config(conn: DatabaseConnection) -> Result<Self> {
-        let config = nihility_config::get_config::<MessagePoolConfig>(env!("CARGO_PKG_NAME"))?;
-        Self::init(config, conn).await
-    }
-
-    /// 直接初始化
     pub async fn init(config: MessagePoolConfig, conn: DatabaseConnection) -> Result<Self> {
         // 创建分析任务通道
         let (task_tx, task_rx) = mpsc::channel::<AnalysisTask>(100);

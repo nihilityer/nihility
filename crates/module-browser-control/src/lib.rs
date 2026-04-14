@@ -91,8 +91,8 @@ impl BrowserControl {
 impl Default for BrowserControlConfig {
     fn default() -> Self {
         Self {
-            viewport_width: 400,
-            viewport_height: 300,
+            viewport_width: 1920,
+            viewport_height: 1080,
             chromium_path: Some("chromium".to_string()),
         }
     }

@@ -37,6 +37,7 @@ nihility-module-message-pool = { path = "crates/module-message-pool" }
 nihility-module-manager = { path = "crates/module-manager" }
 nihility-util-secret = { path = "crates/util-secret" }
 nihility-util-vad = { path = "crates/util-vad" }
+nihility-util-init = { path = "crates/util-init" }
 nihility-server = { path = "server" }
 nihility-store-entity = { path = "crates/store-entity" }
 nihility-store-migration = { path = "crates/store-migration" }
@@ -68,7 +69,8 @@ tokio-stream = { version = "0.1" }
 rust-embed = { version = "8.11" }
 mime_guess = { version = "2.0" }
 image = { version = "0.25" }
-chromiumoxide = { version = "0.9", features = ["rustls", "zip0", "fetcher"] }
+chromiumoxide = { version = "0.9", default-features = false, features = ["rustls", "zip0", "fetcher", "bytes"] }
+chromiumoxide_fetcher = { version = "0.9", default-features = false, features = ["rustls", "zip0"] }
 thiserror = { version = "2.0" }
 anyhow = { version = "1.0" }
 mdns-sd = { version = "0.18" }
@@ -101,3 +103,4 @@ tokio = { workspace = true }
 nihility-log = { workspace = true }
 nihility-config = { workspace = true }
 nihility-server = { workspace = true }
+nihility-util-init = { workspace = true }

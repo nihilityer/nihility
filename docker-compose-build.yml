@@ -1,6 +1,6 @@
 services:
   server:
-    image: ghcr.io/nihilityer/nihility:main
+    build: .
     network_mode: host
     volumes:
       - ./config:/app/config
