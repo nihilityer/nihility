@@ -1,7 +1,9 @@
 services:
   server:
     image: ghcr.io/nihilityer/nihility:main
-    network_mode: host
+    ports:
+      - '8080:8080/tcp'
+      - '8080:8080/udp'
     volumes:
       - ./config:/app/config
       - ./chromium:/app/chromium
