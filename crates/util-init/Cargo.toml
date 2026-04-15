@@ -13,7 +13,6 @@ publish.workspace = true
 [dependencies]
 hf-hub = { workspace = true }
 thiserror = { workspace = true }
-chromiumoxide_fetcher = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 

@@ -9,9 +9,6 @@ pub enum EdgeDeviceControlError {
     Uuid(#[from] uuid::Error),
 
     #[error(transparent)]
-    Mdns(#[from] mdns_sd::Error),
-
-    #[error(transparent)]
     WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
 
     #[error(transparent)]

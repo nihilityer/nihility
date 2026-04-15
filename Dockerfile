@@ -29,4 +29,6 @@ WORKDIR /app
 
 COPY --from=builder /build/target/release/nihility-server /app/
 
+ENv NIHILITY_IN_CONTAINER true
+
 ENTRYPOINT ["/app/nihility-server"]

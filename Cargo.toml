@@ -69,11 +69,9 @@ tokio-stream = { version = "0.1" }
 rust-embed = { version = "8.11" }
 mime_guess = { version = "2.0" }
 image = { version = "0.25" }
-chromiumoxide = { version = "0.9", default-features = false, features = ["rustls", "zip0", "fetcher", "bytes"] }
-chromiumoxide_fetcher = { version = "0.9", default-features = false, features = ["rustls", "zip0"] }
+chromiumoxide = { version = "0.9", default-features = false, features = ["bytes"] }
 thiserror = { version = "2.0" }
 anyhow = { version = "1.0" }
-mdns-sd = { version = "0.18" }
 tokio-tungstenite = { version = "0.29" }
 postcard = { version = "1.1", default-features = false, features = ["alloc"] }
 async-openai = { version = "0.34", default-features = false, features = ["rustls", "completions", "chat-completion", "audio"] }

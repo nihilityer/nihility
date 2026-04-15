@@ -6,7 +6,6 @@ services:
       - '8080:8080/udp'
     volumes:
       - ./config:/app/config
-      - ./chromium:/app/chromium
       - ./model:/app/model
     restart: unless-stopped
     environment:

@@ -1,5 +1,5 @@
 use crate::error::*;
-use tracing::{error, info};
+use tracing::info;
 
 const SYSTEM_DEPS: &[&str] = &[
     "ca-certificates",
@@ -19,6 +19,10 @@ const SYSTEM_DEPS: &[&str] = &[
     "libpango-1.0-0",
     "libpangocairo-1.0-0",
     "fonts-liberation",
+    "fonts-unifont",
+    "fonts-noto",
+    "fonts-noto-color-emoji",
+    "fonts-noto-cjk",
     "xdg-utils",
 ];
 

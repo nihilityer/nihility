@@ -8,8 +8,6 @@ pub enum InitError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     HfApi(#[from] hf_hub::api::tokio::ApiError),
-    #[error(transparent)]
-    ChromiumFetcher(#[from] chromiumoxide_fetcher::FetcherError),
     #[error("Model install error: {0}")]
     Model(String),
     #[error("Chromium install error: {0}")]
