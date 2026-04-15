@@ -18,6 +18,7 @@ pub struct Model {
     pub is_processed: bool,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
+    pub group_id: Uuid,
     #[sea_orm(
         belongs_to,
         from = "scene_id",

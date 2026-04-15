@@ -49,7 +49,7 @@ impl MessagePool {
         // Mark each message as processed using store_operate
         for msg in messages {
             processed_ids.push(msg.id);
-            message::update_message_processed(&self.conn, &msg.id, true).await?;
+            message::update_message_processed(&self.conn, msg.id, true).await?;
         }
 
         Ok(ProcessMessagesResult {

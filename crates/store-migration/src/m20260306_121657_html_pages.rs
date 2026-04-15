@@ -38,12 +38,6 @@ impl MigrationTrait for Migration {
 
         Ok(())
     }
-
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_table(Table::drop().table(HtmlPages::Table).to_owned())
-            .await
-    }
 }
 
 #[derive(DeriveIden)]

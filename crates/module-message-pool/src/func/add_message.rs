@@ -31,6 +31,7 @@ impl MessagePool {
 
         let mut message_ids = Vec::new();
 
+        let group_id = Uuid::new_v4();
         for msg in &param.messages {
             let content_json = serde_json::to_value(&msg.content)?;
 
@@ -42,6 +43,7 @@ impl MessagePool {
                 msg.content.to_msg_type(),
                 content_json,
                 metadata_json,
+                group_id,
                 false,
             )
             .await?;
