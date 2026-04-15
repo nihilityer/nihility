@@ -506,8 +506,8 @@ onUnmounted(() => {
 .display-container {
   width: 100%;
   height: 100%;
-  max-width: 450px;
-  max-height: 350px;
+  max-width: 400px;
+  max-height: 300px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
