@@ -126,8 +126,10 @@ impl ModuleManager {
                     }
                     EmbedModule::SceneManager => {
                         let module = Arc::new(RwLock::new(
-                            nihility_module_scene::SceneManager::init_from_db_config(conn.clone())
-                                .await?,
+                            nihility_module_scene_manager::SceneManager::init_from_db_config(
+                                conn.clone(),
+                            )
+                            .await?,
                         ));
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }

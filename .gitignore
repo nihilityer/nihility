@@ -69,3 +69,4 @@ db.sqlite
 .env
 chromium
 AGENTS.md
+.nihility_initialized

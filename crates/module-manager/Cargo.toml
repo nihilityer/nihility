@@ -18,7 +18,7 @@ nihility-module-browser-control = { workspace = true }
 nihility-module-edge-device-control = { workspace = true }
 nihility-module-model = { workspace = true }
 nihility-module-message-pool = { workspace = true }
-nihility-module-scene = { workspace = true }
+nihility-module-scene-manager = { workspace = true }
 
 tracing = { workspace = true }
 serde = { workspace = true }
