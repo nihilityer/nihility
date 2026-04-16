@@ -17,7 +17,6 @@ pub struct Model {
 }
 
 impl Model {
-    /// 从配置文件初始化
     pub async fn init_from_file_config() -> Result<Self> {
         Self::init(nihility_config::get_config::<ModelConfig>(env!(
             "CARGO_PKG_NAME"
@@ -25,7 +24,14 @@ impl Model {
         .await
     }
 
-    /// 直接初始化
+    pub async fn init_from_db_config(conn: sea_orm::DatabaseConnection) -> Result<Self> {
+        Self::init(
+            nihility_config::get_config_with_db::<ModelConfig>(env!("CARGO_PKG_NAME"), &conn)
+                .await?,
+        )
+        .await
+    }
+
     pub async fn init(config: ModelConfig) -> Result<Self> {
         let pool = ModelPool::new(config);
         info!(

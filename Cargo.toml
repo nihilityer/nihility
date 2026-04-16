@@ -35,6 +35,7 @@ nihility-module-edge-device-control = { path = "crates/module-edge-device-contro
 nihility-module-model = { path = "crates/module-model" }
 nihility-module-message-pool = { path = "crates/module-message-pool" }
 nihility-module-manager = { path = "crates/module-manager" }
+nihility-module-scene = { path = "crates/module-scene" }
 nihility-util-secret = { path = "crates/util-secret" }
 nihility-util-vad = { path = "crates/util-vad" }
 nihility-util-init = { path = "crates/util-init" }

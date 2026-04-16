@@ -1,5 +1,5 @@
 [package]
-name = "nihility-module-message-pool"
+name = "nihility-module-scene"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -15,6 +15,7 @@ nihility-config = { workspace = true, features = ["db"] }
 nihility-module = { workspace = true }
 nihility-store-operate = { workspace = true }
 
+sea-orm = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
@@ -23,6 +24,3 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 anyhow = { workspace = true }
-
-tokio = { workspace = true }
-sea-orm = { workspace = true }

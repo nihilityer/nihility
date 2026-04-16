@@ -139,12 +139,18 @@ pub struct MessagePool {
 }
 
 impl MessagePool {
+    pub async fn init_from_db_config(conn: DatabaseConnection) -> Result<Self> {
+        Self::init(
+            nihility_config::get_config_with_db::<MessagePoolConfig>(env!("CARGO_PKG_NAME"), &conn)
+                .await?,
+            conn,
+        )
+        .await
+    }
+
     pub async fn init(config: MessagePoolConfig, conn: DatabaseConnection) -> Result<Self> {
         let (task_tx, task_rx) = mpsc::unbounded_channel::<Uuid>();
-
-        info!("MessagePool initialized with config: {:?}", config);
         let task = tokio::spawn(analysis_worker(task_rx, config, conn.clone()));
-
         Ok(Self {
             conn,
             task_tx,

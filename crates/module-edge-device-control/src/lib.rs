@@ -58,6 +58,17 @@ impl EdgeDeviceControl {
         .await
     }
 
+    pub async fn init_from_db_config(conn: sea_orm::DatabaseConnection) -> Result<Self> {
+        Self::init(
+            nihility_config::get_config_with_db::<EdgeDeviceControlConfig>(
+                env!("CARGO_PKG_NAME"),
+                &conn,
+            )
+            .await?,
+        )
+        .await
+    }
+
     pub async fn init(config: EdgeDeviceControlConfig) -> Result<Self> {
         let devices = Arc::new(RwLock::new(HashMap::new()));
         let auto_connect: HashMap<String, (String, Option<String>)> = config

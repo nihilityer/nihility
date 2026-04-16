@@ -35,6 +35,19 @@ impl BrowserControl {
         .await
     }
 
+    pub async fn init_from_db_config(
+        conn: sea_orm::DatabaseConnection,
+    ) -> Result<Self> {
+        Self::init(
+            nihility_config::get_config_with_db::<BrowserControlConfig>(
+                env!("CARGO_PKG_NAME"),
+                &conn,
+            )
+            .await?,
+        )
+        .await
+    }
+
     pub async fn init(config: BrowserControlConfig) -> Result<Self> {
         let browser_config = BrowserConfig::builder()
             .viewport(Viewport {

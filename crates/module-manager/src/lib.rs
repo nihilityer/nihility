@@ -23,6 +23,7 @@ pub enum EmbedModule {
     EdgeDeviceControl,
     Model,
     MessagePool,
+    Scene,
 }
 
 /// 模块功能列表
@@ -68,36 +69,25 @@ impl ModuleManager {
             match enable_module {
                 ModuleType::Embed(embed_module) => match embed_module {
                     EmbedModule::BrowserControl => {
-                        let config =
-                            nihility_config::get_config_with_db::<
-                                nihility_module_browser_control::BrowserControlConfig,
-                            >("nihility-module-browser-control", &conn)
-                            .await?;
                         let module = Arc::new(RwLock::new(
-                            nihility_module_browser_control::BrowserControl::init(config).await?,
+                            nihility_module_browser_control::BrowserControl::init_from_db_config(
+                                conn.clone(),
+                            )
+                            .await?,
                         ));
                         browser_control = Some(module.clone());
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                     EmbedModule::Model => {
-                        let config = nihility_config::get_config_with_db::<
-                            nihility_module_model::ModelConfig,
-                        >("nihility-module-model", &conn)
-                        .await?;
                         let module = Arc::new(RwLock::new(
-                            nihility_module_model::Model::init(config).await?,
+                            nihility_module_model::Model::init_from_db_config(conn.clone()).await?,
                         ));
                         model = Some(module.clone());
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                     EmbedModule::EdgeDeviceControl => {
-                        let config = nihility_config::get_config_with_db::<
-                            nihility_module_edge_device_control::EdgeDeviceControlConfig,
-                        >(
-                            "nihility-module-edge-device-control", &conn
-                        )
-                        .await?;
-                        let mut module = EdgeDeviceControl::init(config).await?;
+                        let mut module =
+                            EdgeDeviceControl::init_from_db_config(conn.clone()).await?;
                         if let Some(browser_control) = browser_control.as_ref() {
                             module.set_browser_control(browser_control.clone());
                         } else {
@@ -124,17 +114,20 @@ impl ModuleManager {
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                     EmbedModule::MessagePool => {
-                        let config =
-                            nihility_config::get_config_with_db::<
-                                nihility_module_message_pool::MessagePoolConfig,
-                            >("nihility-module-message-pool", &conn)
-                            .await?;
                         let module = Arc::new(RwLock::new(
-                            nihility_module_message_pool::MessagePool::init(config, conn.clone())
-                                .await?,
+                            nihility_module_message_pool::MessagePool::init_from_db_config(
+                                conn.clone(),
+                            )
+                            .await?,
                         ));
                         let monitor_module = module.clone();
                         tokio::spawn(nihility_module_message_pool::monitor_task(monitor_module));
+                        modules.insert(ModuleType::Embed(embed_module), module);
+                    }
+                    EmbedModule::Scene => {
+                        let module = Arc::new(RwLock::new(
+                            nihility_module_scene::Scene::init_from_db_config(conn.clone()).await?,
+                        ));
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                 },
@@ -267,6 +260,7 @@ impl Default for ModuleManagerConfig {
                 ModuleType::Embed(EmbedModule::MessagePool),
                 ModuleType::Embed(EmbedModule::EdgeDeviceControl),
                 ModuleType::Embed(EmbedModule::Model),
+                ModuleType::Embed(EmbedModule::Scene),
             ],
         }
     }
@@ -289,6 +283,7 @@ impl ModuleManagerConfig {
             EmbedModule::MessagePool => 1,
             EmbedModule::Model => 2,
             EmbedModule::EdgeDeviceControl => 3,
+            EmbedModule::Scene => 4,
         });
 
         let mut enable_modules = Vec::with_capacity(embeds.len() + wasms.len());
@@ -309,6 +304,7 @@ impl Serialize for EmbedModule {
             EmbedModule::EdgeDeviceControl => "edge-device-control",
             EmbedModule::Model => "model",
             EmbedModule::MessagePool => "message-pool",
+            EmbedModule::Scene => "scene",
         };
         serializer.serialize_str(s)
     }
@@ -325,6 +321,7 @@ impl<'de> Deserialize<'de> for EmbedModule {
             "edge-device-control" => Ok(EmbedModule::EdgeDeviceControl),
             "model" => Ok(EmbedModule::Model),
             "message-pool" => Ok(EmbedModule::MessagePool),
+            "scene" => Ok(EmbedModule::Scene),
             _ => Err(serde::de::Error::custom(format!(
                 "unknown embed module: {}",
                 s
@@ -345,6 +342,7 @@ impl Serialize for ModuleType {
                     EmbedModule::EdgeDeviceControl => "edge-device-control",
                     EmbedModule::Model => "model",
                     EmbedModule::MessagePool => "message-pool",
+                    EmbedModule::Scene => "scene",
                 };
                 format!("embed-{}", embed_str)
             }
@@ -367,6 +365,7 @@ impl<'de> Deserialize<'de> for ModuleType {
                 "edge-device-control" => Ok(ModuleType::Embed(EmbedModule::EdgeDeviceControl)),
                 "model" => Ok(ModuleType::Embed(EmbedModule::Model)),
                 "message-pool" => Ok(ModuleType::Embed(EmbedModule::MessagePool)),
+                "scene" => Ok(ModuleType::Embed(EmbedModule::Scene)),
                 _ => Err(serde::de::Error::custom(format!(
                     "unknown embed module: {}",
                     embed_name

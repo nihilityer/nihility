@@ -17,6 +17,9 @@ pub enum ModuleManagerError {
     #[error(transparent)]
     MessagePool(#[from] nihility_module_message_pool::error::MessagePoolError),
 
+    #[error(transparent)]
+    Scene(#[from] nihility_module_scene::error::SceneError),
+
     #[error("Module not found: {0:?}")]
     ModuleNotFound(crate::ModuleType),
 
