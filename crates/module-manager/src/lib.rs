@@ -23,7 +23,7 @@ pub enum EmbedModule {
     EdgeDeviceControl,
     Model,
     MessagePool,
-    Scene,
+    SceneManager,
 }
 
 /// 模块功能列表
@@ -124,9 +124,10 @@ impl ModuleManager {
                         tokio::spawn(nihility_module_message_pool::monitor_task(monitor_module));
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
-                    EmbedModule::Scene => {
+                    EmbedModule::SceneManager => {
                         let module = Arc::new(RwLock::new(
-                            nihility_module_scene::Scene::init_from_db_config(conn.clone()).await?,
+                            nihility_module_scene::SceneManager::init_from_db_config(conn.clone())
+                                .await?,
                         ));
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
@@ -260,7 +261,7 @@ impl Default for ModuleManagerConfig {
                 ModuleType::Embed(EmbedModule::MessagePool),
                 ModuleType::Embed(EmbedModule::EdgeDeviceControl),
                 ModuleType::Embed(EmbedModule::Model),
-                ModuleType::Embed(EmbedModule::Scene),
+                ModuleType::Embed(EmbedModule::SceneManager),
             ],
         }
     }
@@ -283,7 +284,7 @@ impl ModuleManagerConfig {
             EmbedModule::MessagePool => 1,
             EmbedModule::Model => 2,
             EmbedModule::EdgeDeviceControl => 3,
-            EmbedModule::Scene => 4,
+            EmbedModule::SceneManager => 4,
         });
 
         let mut enable_modules = Vec::with_capacity(embeds.len() + wasms.len());
@@ -304,7 +305,7 @@ impl Serialize for EmbedModule {
             EmbedModule::EdgeDeviceControl => "edge-device-control",
             EmbedModule::Model => "model",
             EmbedModule::MessagePool => "message-pool",
-            EmbedModule::Scene => "scene",
+            EmbedModule::SceneManager => "scene-manager",
         };
         serializer.serialize_str(s)
     }
@@ -321,7 +322,7 @@ impl<'de> Deserialize<'de> for EmbedModule {
             "edge-device-control" => Ok(EmbedModule::EdgeDeviceControl),
             "model" => Ok(EmbedModule::Model),
             "message-pool" => Ok(EmbedModule::MessagePool),
-            "scene" => Ok(EmbedModule::Scene),
+            "scene-manager" => Ok(EmbedModule::SceneManager),
             _ => Err(serde::de::Error::custom(format!(
                 "unknown embed module: {}",
                 s
@@ -342,7 +343,7 @@ impl Serialize for ModuleType {
                     EmbedModule::EdgeDeviceControl => "edge-device-control",
                     EmbedModule::Model => "model",
                     EmbedModule::MessagePool => "message-pool",
-                    EmbedModule::Scene => "scene",
+                    EmbedModule::SceneManager => "scene-manager",
                 };
                 format!("embed-{}", embed_str)
             }
@@ -365,7 +366,7 @@ impl<'de> Deserialize<'de> for ModuleType {
                 "edge-device-control" => Ok(ModuleType::Embed(EmbedModule::EdgeDeviceControl)),
                 "model" => Ok(ModuleType::Embed(EmbedModule::Model)),
                 "message-pool" => Ok(ModuleType::Embed(EmbedModule::MessagePool)),
-                "scene" => Ok(ModuleType::Embed(EmbedModule::Scene)),
+                "scene-manager" => Ok(ModuleType::Embed(EmbedModule::SceneManager)),
                 _ => Err(serde::de::Error::custom(format!(
                     "unknown embed module: {}",
                     embed_name

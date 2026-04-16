@@ -1,5 +1,5 @@
 use crate::error::*;
-use crate::Scene;
+use crate::SceneManager;
 use nihility_store_operate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub struct DeleteSceneResult {
     pub id: Uuid,
 }
 
-impl Scene {
+impl SceneManager {
     pub async fn delete_scene(&self, param: DeleteSceneParam) -> Result<DeleteSceneResult> {
         nihility_store_operate::scene::delete_scene(&self.db, param.id).await?;
         Ok(DeleteSceneResult {

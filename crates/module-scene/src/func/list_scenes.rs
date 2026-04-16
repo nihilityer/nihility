@@ -1,8 +1,9 @@
 use crate::error::*;
-use crate::Scene;
+use crate::{SceneManager, SceneMetadata};
 use nihility_store_operate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 
 /// 列出场景参数
@@ -17,19 +18,17 @@ pub struct SceneItem {
     pub id: Uuid,
     pub name: String,
     pub parent_id: Option<Uuid>,
-    pub metadata: serde_json::Value,
-    pub created_at: String,
-    pub updated_at: String,
+    pub metadata: SceneMetadata,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListSccenesResult {
+pub struct ListScenesResult {
     pub scenes: Vec<SceneItem>,
     pub total: usize,
 }
 
-impl Scene {
-    pub async fn list_scenes(&self, param: ListScenesParam) -> Result<ListSccenesResult> {
+impl SceneManager {
+    pub async fn list_scenes(&self, param: ListScenesParam) -> Result<ListScenesResult> {
         let scenes = if let Some(parent_id) = param.parent_id {
             nihility_store_operate::scene::find_scenes_by_parent_id(&self.db, parent_id).await?
         } else {
@@ -38,21 +37,25 @@ impl Scene {
 
         let items: Vec<SceneItem> = scenes
             .into_iter()
-            .map(|s| {
-                let metadata: serde_json::Value = s.metadata;
-                SceneItem {
+            .filter_map(|s| {
+                let metadata = match serde_json::from_value::<SceneMetadata>(s.metadata.clone()) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        error!("invalid scene metadata: {}", e);
+                        return None;
+                    }
+                };
+                Some(SceneItem {
                     id: s.id,
                     name: s.name,
                     parent_id: s.parent_id,
                     metadata,
-                    created_at: s.created_at.to_rfc3339(),
-                    updated_at: s.updated_at.to_rfc3339(),
-                }
+                })
             })
             .collect();
 
         let total = items.len();
-        Ok(ListSccenesResult {
+        Ok(ListScenesResult {
             scenes: items,
             total,
         })

@@ -3,7 +3,7 @@ use crate::func::delete_scene::DeleteSceneParam;
 use crate::func::get_scene::GetSceneParam;
 use crate::func::list_scenes::ListScenesParam;
 use crate::func::update_scene::UpdateSceneParam;
-use crate::Scene;
+use crate::SceneManager;
 use nihility_module::{BoxStream, Callable, FunctionMetadata, Module};
 use schemars::schema_for;
 use serde_json::Value;
@@ -16,9 +16,9 @@ pub mod list_scenes;
 pub mod update_scene;
 
 #[async_trait::async_trait]
-impl Callable for Scene {
+impl Callable for SceneManager {
     async fn call(&self, func_name: &str, param: Value) -> anyhow::Result<Value> {
-        debug!(func_name = %func_name, param = ?param, "Scene module call");
+        debug!(func_name = %func_name, param = ?param, "Scene manager module call");
         match func_name {
             "get_scene" => Ok(serde_json::to_value(
                 self.get_scene(serde_json::from_value(param)?).await?,
@@ -31,7 +31,7 @@ impl Callable for Scene {
     }
 
     async fn call_mut(&mut self, func_name: &str, param: Value) -> anyhow::Result<Value> {
-        debug!(func_name = %func_name, param = ?param, "Scene module call_mut");
+        debug!(func_name = %func_name, param = ?param, "Scene manager module call_mut");
         match func_name {
             "create_scene" => Ok(serde_json::to_value(
                 self.create_scene(serde_json::from_value(param)?).await?,
@@ -51,12 +51,12 @@ impl Callable for Scene {
         func_name: &str,
         _param: Value,
     ) -> anyhow::Result<BoxStream<Value>> {
-        debug!(func_name = %func_name, "Scene module does not support streaming");
-        Err(anyhow::anyhow!("Scene does not support streaming"))
+        debug!(func_name = %func_name, "Scene manager module does not support streaming");
+        Err(anyhow::anyhow!("Scene manager does not support streaming"))
     }
 }
 
-impl Module for Scene {
+impl Module for SceneManager {
     fn description(&self) -> &str {
         "场景管理模块，提供创建、查询、更新、删除场景等功能"
     }

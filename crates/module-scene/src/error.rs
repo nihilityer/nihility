@@ -5,9 +5,6 @@ pub enum SceneError {
     #[error(transparent)]
     Config(#[from] nihility_config::ConfigError),
 
-    #[error("Operation error: {0}")]
-    Operation(String),
-
     #[error(transparent)]
     Database(#[from] nihility_store_operate::StoreError),
 
@@ -16,7 +13,4 @@ pub enum SceneError {
 
     #[error(transparent)]
     Json(#[from] serde_json::Error),
-
-    #[error("Scene not found: {0}")]
-    NotFound(String),
 }

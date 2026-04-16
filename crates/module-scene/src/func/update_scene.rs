@@ -1,10 +1,8 @@
 use crate::error::*;
-use crate::Scene;
+use crate::{SceneManager, SceneMetadata};
 use nihility_store_operate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::str::FromStr;
 use uuid::Uuid;
 
 /// 更新场景参数
@@ -16,8 +14,8 @@ pub struct UpdateSceneParam {
     pub name: Option<String>,
     /// 父场景ID（可选）
     pub parent_id: Option<Uuid>,
-    /// 场景Json元数据（可选）
-    pub metadata: Option<String>,
+    /// 场景元数据（可选）
+    pub metadata: Option<SceneMetadata>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,15 +23,13 @@ pub struct UpdateSceneResult {
     pub id: Uuid,
     pub name: String,
     pub parent_id: Option<Uuid>,
-    pub metadata: serde_json::Value,
-    pub created_at: String,
-    pub updated_at: String,
+    pub metadata: SceneMetadata,
 }
 
-impl Scene {
+impl SceneManager {
     pub async fn update_scene(&self, param: UpdateSceneParam) -> Result<UpdateSceneResult> {
         let metadata = if let Some(metadata) = &param.metadata {
-            Some(Value::from_str(metadata)?)
+            Some(serde_json::to_value(metadata)?)
         } else {
             None
         };
@@ -46,15 +42,11 @@ impl Scene {
         )
         .await?;
 
-        let metadata: Value = model.metadata;
-
         Ok(UpdateSceneResult {
             id: model.id,
             name: model.name,
             parent_id: model.parent_id,
-            metadata,
-            created_at: model.created_at.to_rfc3339(),
-            updated_at: model.updated_at.to_rfc3339(),
+            metadata: serde_json::from_value(model.metadata)?,
         })
     }
 }
