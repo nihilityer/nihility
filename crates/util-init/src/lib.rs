@@ -7,14 +7,35 @@ use crate::chromium_install::chromium_install;
 use crate::deps_install::deps_install;
 use crate::model_install::model_install;
 use error::*;
+use std::path::PathBuf;
 use tokio::task::JoinSet;
 use tracing::{error, info};
+
+const INIT_MARKER_FILE: &str = ".nihility_initialized";
 
 fn is_in_container() -> bool {
     std::env::var("NIHILITY_IN_CONTAINER").is_ok()
 }
 
+fn get_marker_path() -> PathBuf {
+    PathBuf::from(INIT_MARKER_FILE)
+}
+
+fn is_initialized() -> bool {
+    get_marker_path().exists()
+}
+
+fn mark_initialized() -> std::io::Result<()> {
+    std::fs::write(get_marker_path(), "")?;
+    Ok(())
+}
+
 pub async fn init() -> Result<()> {
+    if is_initialized() {
+        info!("Already initialized, skipping");
+        return Ok(());
+    }
+
     if is_in_container() {
         match deps_install().await {
             Ok(()) => {
@@ -50,6 +71,10 @@ pub async fn init() -> Result<()> {
                 return Err(InitError::Task(e));
             }
         }
+    }
+
+    if let Err(e) = mark_initialized() {
+        error!("Failed to create initialization marker: {}", e);
     }
 
     info!("Initialization complete");
