@@ -1,7 +1,10 @@
-use crate::{ContentData, MessageMetadata, MessagePoolError};
+use crate::{ContentData, MessagePoolError};
 use async_trait::async_trait;
+use nihility_store_operate::message;
+use sea_orm::DatabaseConnection;
+use uuid::Uuid;
 
-use crate::analysis::{AnalysisContext, Analyzer};
+use crate::analysis::Analyzer;
 
 /// 命令分析器
 /// 检查消息是否以 `/` 开头，如果是则终止分析链
@@ -27,10 +30,30 @@ impl Analyzer for CommandAnalyzer {
 
     async fn analyze(
         &self,
-        _content: &ContentData,
-        _metadata: &MessageMetadata,
-        _context: &AnalysisContext,
+        db: &DatabaseConnection,
+        group_id: Uuid,
     ) -> Result<bool, MessagePoolError> {
-        todo!()
+        // 根据 group_id 拉取所有消息
+        let messages = message::find_message_by_group_id(db, group_id).await?;
+
+        for msg in messages {
+            let content: ContentData = serde_json::from_value(msg.content)?;
+
+            // 检查是否是文本消息且以 `/` 开头
+            if let ContentData::Text { body } = content
+                && body.starts_with('/')
+            {
+                tracing::info!(
+                    "Command detected in group_id {}: {}",
+                    group_id,
+                    body.split_whitespace().next().unwrap_or(&body)
+                );
+                // 命令分析器检测到命令，终止后续分析链
+                return Ok(false);
+            }
+        }
+
+        // 未检测到命令，继续分析链
+        Ok(true)
     }
 }

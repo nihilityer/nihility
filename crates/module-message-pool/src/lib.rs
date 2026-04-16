@@ -2,18 +2,21 @@ pub mod analysis;
 pub mod error;
 pub mod func;
 
-pub use analysis::{AnalysisEngine, AnalysisTask};
+pub use analysis::{analysis_worker, GroupIdTask};
 pub use error::MessagePoolError;
+use std::sync::Arc;
+use std::time::Duration;
 
 use crate::error::*;
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
-use tracing::info;
+use tokio::sync::{mpsc, RwLock};
+use tokio::task::JoinHandle;
+use tracing::{error, info};
 use uuid::Uuid;
 
 /// 分析器类型枚举
-#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema, Hash, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum AnalyzerType {
     /// 命令分析器 - 检测以 `/` 开头的消息
@@ -107,27 +110,15 @@ impl ContentData {
     }
 }
 
-/// 消息元数据
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema, Default)]
-pub struct MessageMetadata {
-    /// 来源设备 ID
-    pub device_id: Option<String>,
-    /// 原始格式
-    pub format: Option<String>,
-    /// 用户自定义标签
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
-
 /// 消息结构体
 /// content 枚举直接包含消息类型，可以区分文本/音频/图片/视频
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Message {
     /// 消息内容（包含类型信息）
     pub content: ContentData,
-    /// 消息元数据
+    /// 消息元数据（JSON Value，AI 引擎按需解析）
     #[serde(default)]
-    pub metadata: MessageMetadata,
+    pub metadata: serde_json::Value,
 }
 
 /// 场景信息
@@ -137,45 +128,55 @@ pub struct SceneInfo {
     pub name: String,
     pub parent_id: Option<String>,
     pub metadata: serde_json::Value,
-    /// 直接子场景 ID 列表
     pub children_ids: Vec<String>,
 }
 
 /// 消息池主结构
 pub struct MessagePool {
     conn: DatabaseConnection,
-    task_tx: mpsc::Sender<AnalysisTask>,
+    task_tx: mpsc::UnboundedSender<Uuid>,
+    analysis_task: Option<JoinHandle<Result<()>>>,
 }
 
 impl MessagePool {
     pub async fn init(config: MessagePoolConfig, conn: DatabaseConnection) -> Result<Self> {
-        // 创建分析任务通道
-        let (task_tx, task_rx) = mpsc::channel::<AnalysisTask>(100);
-
-        // 创建分析引擎并获取分析器列表
-        let engine = AnalysisEngine::new(config.clone(), task_tx.clone());
-        let analyzers = engine.get_analyzers();
-
-        // 启动分析 worker
-        let worker_conn = conn.clone();
-        tokio::spawn(async move {
-            AnalysisEngine::start_worker(task_rx, analyzers, worker_conn).await;
-        });
+        let (task_tx, task_rx) = mpsc::unbounded_channel::<Uuid>();
 
         info!("MessagePool initialized with config: {:?}", config);
-        Ok(Self { conn, task_tx })
+        let task = tokio::spawn(analysis_worker(task_rx, config, conn.clone()));
+
+        Ok(Self {
+            conn,
+            task_tx,
+            analysis_task: Some(task),
+        })
     }
 
     /// 触发分析链
-    pub fn trigger_analysis(&self, scene_id: Uuid, message_id: Uuid) {
-        let task = AnalysisTask {
-            scene_id,
-            message_id,
-        };
-
-        // 发送任务到分析通道
-        if let Err(e) = self.task_tx.try_send(task) {
+    pub fn trigger_analysis(&self, group_id: Uuid) {
+        if let Err(e) = self.task_tx.send(group_id) {
             tracing::warn!("Failed to send analysis task: {}", e);
+        }
+    }
+}
+
+pub async fn monitor_task(module: Arc<RwLock<MessagePool>>) {
+    loop {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let mut module = module.write().await;
+        if let Some(task) = module.analysis_task.as_ref()
+            && task.is_finished()
+            && let Some(task) = module.analysis_task.take()
+        {
+            match task.await {
+                Ok(Ok(())) => info!("Analysis task finished"),
+                Ok(Err(e)) => {
+                    error!("Analysis task failed: {}", e);
+                }
+                Err(join_err) => {
+                    error!("Analysis task join failed: {}", join_err);
+                }
+            }
         }
     }
 }

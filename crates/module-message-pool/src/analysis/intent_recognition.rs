@@ -1,10 +1,13 @@
-use crate::{ContentData, MessageMetadata, MessagePoolError};
+use crate::MessagePoolError;
 use async_trait::async_trait;
+use nihility_store_operate::message;
+use sea_orm::DatabaseConnection;
+use uuid::Uuid;
 
-use crate::analysis::{AnalysisContext, Analyzer};
+use crate::analysis::Analyzer;
 
 /// 意图识别器
-/// 使用提示词方式进行意图识别（提示词模板留空待填充）
+/// 使用提示词方式进行意图识别
 pub struct IntentAnalyzer {
     priority: i32,
 }
@@ -27,10 +30,22 @@ impl Analyzer for IntentAnalyzer {
 
     async fn analyze(
         &self,
-        _content: &ContentData,
-        _metadata: &MessageMetadata,
-        _context: &AnalysisContext,
+        db: &DatabaseConnection,
+        group_id: Uuid,
     ) -> Result<bool, MessagePoolError> {
-        todo!()
+        // 根据 group_id 拉取所有消息
+        let messages = message::find_message_by_group_id(db, group_id).await?;
+
+        // TODO: 实现意图识别逻辑
+        // 可以遍历消息内容，使用 AI 模型进行意图识别
+
+        tracing::info!(
+            "IntentAnalyzer processed {} messages in group_id {}",
+            messages.len(),
+            group_id
+        );
+
+        // 意图识别不终止分析链
+        Ok(true)
     }
 }

@@ -17,8 +17,7 @@ pub struct AddMessagesParam {
 /// 添加消息返回结果
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AddMessagesResult {
-    /// 消息 ID 列表
-    pub message_ids: Vec<String>,
+    pub message_ids: Vec<Uuid>,
 }
 
 impl MessagePool {
@@ -32,10 +31,11 @@ impl MessagePool {
         let mut message_ids = Vec::new();
 
         let group_id = Uuid::new_v4();
+
         for msg in &param.messages {
             let content_json = serde_json::to_value(&msg.content)?;
 
-            let metadata_json = serde_json::to_value(&msg.metadata)?;
+            let metadata_json = msg.metadata.clone();
 
             let message = message::insert_message(
                 &self.conn,
@@ -48,10 +48,10 @@ impl MessagePool {
             )
             .await?;
 
-            message_ids.push(message.id.to_string());
-
-            self.trigger_analysis(param.scene_id, message.id);
+            message_ids.push(message.id);
         }
+
+        self.trigger_analysis(group_id);
 
         Ok(AddMessagesResult { message_ids })
     }

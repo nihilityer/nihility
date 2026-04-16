@@ -3,26 +3,19 @@ mod intent_recognition;
 
 use crate::analysis::command_analysis::CommandAnalyzer;
 use crate::analysis::intent_recognition::IntentAnalyzer;
-use crate::{AnalyzerType, ContentData, MessageMetadata, MessagePoolConfig, MessagePoolError};
+use crate::error::*;
+use crate::{AnalyzerType, MessagePoolConfig};
 use async_trait::async_trait;
-use nihility_store_operate::message::MsgType;
+use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
-/// 分析上下文
+/// 分组分析任务（只包含 group_id）
 #[derive(Debug, Clone)]
-pub struct AnalysisContext {
-    pub scene_id: Uuid,
-    pub message_id: Uuid,
-}
-
-/// 分析任务消息
-#[derive(Debug, Clone)]
-pub struct AnalysisTask {
-    pub scene_id: Uuid,
-    pub message_id: Uuid,
+pub struct GroupIdTask {
+    pub group_id: Uuid,
 }
 
 /// 分析器特征
@@ -36,148 +29,72 @@ pub trait Analyzer: Send + Sync {
     fn priority(&self) -> i32;
 
     /// 执行分析
-    async fn analyze(
-        &self,
-        content: &ContentData,
-        metadata: &MessageMetadata,
-        context: &AnalysisContext,
-    ) -> Result<bool, MessagePoolError>;
+    async fn analyze(&self, db: &DatabaseConnection, group_id: Uuid) -> Result<bool>;
 }
 
-/// 分析引擎
-#[allow(dead_code)]
-pub struct AnalysisEngine {
+/// 根据配置创建分析器
+fn create_analyzer(config: &crate::AnalyzerConfig) -> Option<Arc<dyn Analyzer>> {
+    match &config.analyzer_type {
+        AnalyzerType::CommandAnalysis => {
+            Some(Arc::new(CommandAnalyzer::new(config.priority)) as Arc<dyn Analyzer>)
+        }
+        AnalyzerType::IntentRecognition => {
+            Some(Arc::new(IntentAnalyzer::new(config.priority)) as Arc<dyn Analyzer>)
+        }
+    }
+}
+
+pub async fn analysis_worker(
+    mut task_rx: mpsc::UnboundedReceiver<Uuid>,
     config: MessagePoolConfig,
-    /// 已注册的分析器列表
-    analyzers: Vec<Arc<dyn Analyzer>>,
-    /// 分析任务发送通道
-    task_tx: mpsc::Sender<AnalysisTask>,
-}
+    conn: DatabaseConnection,
+) -> Result<()> {
+    // 根据配置创建分析器
+    let mut analyzers: Vec<Arc<dyn Analyzer>> = Vec::new();
 
-impl AnalysisEngine {
-    /// 创建分析引擎
-    pub fn new(config: MessagePoolConfig, task_tx: mpsc::Sender<AnalysisTask>) -> Self {
-        let analyzers = Self::create_analyzers(&config);
-        Self {
-            config,
-            analyzers,
-            task_tx,
+    for analyzer_config in &config.analyzers {
+        if !analyzer_config.enabled {
+            continue;
+        }
+        if let Some(analyzer) = create_analyzer(analyzer_config) {
+            analyzers.push(analyzer);
         }
     }
 
-    /// 根据配置创建分析器实例
-    fn create_analyzers(config: &MessagePoolConfig) -> Vec<Arc<dyn Analyzer>> {
-        let mut analyzers: Vec<Arc<dyn Analyzer>> = Vec::new();
+    // 按优先级排序
+    analyzers.sort_by_key(|a| a.priority());
 
-        for analyzer_config in &config.analyzers {
-            if !analyzer_config.enabled {
-                continue;
-            }
-
-            let analyzer: Option<Arc<dyn Analyzer>> = match &analyzer_config.analyzer_type {
-                AnalyzerType::CommandAnalysis => {
-                    Some(Arc::new(CommandAnalyzer::new(analyzer_config.priority))
-                        as Arc<dyn Analyzer>)
-                }
-                AnalyzerType::IntentRecognition => {
-                    Some(Arc::new(IntentAnalyzer::new(analyzer_config.priority))
-                        as Arc<dyn Analyzer>)
-                }
-            };
-
-            if let Some(a) = analyzer {
-                analyzers.push(a);
-            }
-        }
-
-        // 按优先级排序（从小到大）
-        analyzers.sort_by_key(|a| a.priority());
-
-        info!("Analysis engine created with {} analyzers", analyzers.len());
-        for a in &analyzers {
-            info!("  - {} (priority: {})", a.name(), a.priority());
-        }
-
-        analyzers
+    info!("Analysis worker started with {} analyzers", analyzers.len());
+    for a in &analyzers {
+        info!("  - {} (priority: {})", a.name(), a.priority(),);
     }
 
-    /// 获取任务发送通道
-    pub fn task_sender(&self) -> mpsc::Sender<AnalysisTask> {
-        self.task_tx.clone()
-    }
+    while let Some(group_id) = task_rx.recv().await {
+        info!("Received analysis task for group_id {}", group_id);
 
-    /// 获取分析器列表（用于启动 worker）
-    pub fn get_analyzers(&self) -> Vec<Arc<dyn Analyzer>> {
-        self.analyzers.clone()
-    }
+        // 按优先级顺序执行分析链
+        for analyzer in &analyzers {
+            debug!("Running analyzer: {}", analyzer.name());
 
-    /// 启动消费者 worker，持续监听分析任务
-    pub async fn start_worker(
-        mut task_rx: mpsc::Receiver<AnalysisTask>,
-        analyzers: Vec<Arc<dyn Analyzer>>,
-        conn: sea_orm::DatabaseConnection,
-    ) {
-        info!("Analysis worker started");
-        while let Some(task) = task_rx.recv().await {
-            info!(
-                "Received analysis task for message {} in scene {}",
-                task.message_id, task.scene_id
-            );
-
-            // 从数据库加载消息内容
-            match Self::load_message(&conn, task.message_id).await {
-                Ok((_, content, metadata)) => {
-                    let context = AnalysisContext {
-                        scene_id: task.scene_id,
-                        message_id: task.message_id,
-                    };
-
-                    // 执行分析链
-                    for analyzer in &analyzers {
-                        debug!("Running analyzer: {}", analyzer.name());
-
-                        match analyzer.analyze(&content, &metadata, &context).await {
-                            Ok(should_continue) => {
-                                if !should_continue {
-                                    info!(
-                                        "Analyzer {} returned false, terminating analysis chain",
-                                        analyzer.name()
-                                    );
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                error!("Analyzer {} failed: {}", analyzer.name(), e);
-                            }
-                        }
+            match analyzer.analyze(&conn, group_id).await {
+                Ok(should_continue) => {
+                    if !should_continue {
+                        info!(
+                            "Analyzer {} returned false, terminating analysis chain",
+                            analyzer.name()
+                        );
+                        break;
                     }
-
-                    info!("Analysis chain completed for message {}", task.message_id);
                 }
                 Err(e) => {
-                    error!(
-                        "Failed to load message {} for analysis: {}",
-                        task.message_id, e
-                    );
+                    error!("Analyzer {} failed: {}", analyzer.name(), e);
                 }
             }
         }
-        info!("Analysis worker stopped");
+
+        info!("Analysis chain completed for group_id {}", group_id);
     }
 
-    /// 从数据库加载消息
-    async fn load_message(
-        conn: &sea_orm::DatabaseConnection,
-        message_id: Uuid,
-    ) -> Result<(MsgType, ContentData, MessageMetadata), MessagePoolError> {
-        use nihility_store_operate::message;
-
-        let message = message::find_message_by_id(conn, message_id).await?;
-
-        let msg_type = message.msg_type;
-        let content: ContentData = serde_json::from_value(message.content)?;
-        let metadata: MessageMetadata = serde_json::from_value(message.metadata)?;
-
-        Ok((msg_type, content, metadata))
-    }
+    info!("Analysis worker stopped");
+    Ok(())
 }

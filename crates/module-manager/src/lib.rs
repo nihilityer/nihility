@@ -133,6 +133,8 @@ impl ModuleManager {
                             nihility_module_message_pool::MessagePool::init(config, conn.clone())
                                 .await?,
                         ));
+                        let monitor_module = module.clone();
+                        tokio::spawn(nihility_module_message_pool::monitor_task(monitor_module));
                         modules.insert(ModuleType::Embed(embed_module), module);
                     }
                 },
