@@ -3,6 +3,8 @@ use crate::Scene;
 use nihility_store_operate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// 创建场景参数
@@ -13,7 +15,7 @@ pub struct CreateSceneParam {
     /// 父场景ID（可选，用于层级结构）
     pub parent_id: Option<Uuid>,
     /// 场景元数据（JSON对象，包含场景描述等）
-    pub metadata: serde_json::Value,
+    pub metadata: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,7 +23,7 @@ pub struct CreateSceneResult {
     pub id: Uuid,
     pub name: String,
     pub parent_id: Option<Uuid>,
-    pub metadata: serde_json::Value,
+    pub metadata: Value,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -32,7 +34,7 @@ impl Scene {
             &self.db,
             param.name,
             param.parent_id,
-            param.metadata.clone(),
+            Value::from_str(&param.metadata)?,
         )
         .await?;
 
@@ -40,7 +42,7 @@ impl Scene {
             id: model.id,
             name: model.name,
             parent_id: model.parent_id,
-            metadata: param.metadata,
+            metadata: model.metadata,
             created_at: model.created_at.to_rfc3339(),
             updated_at: model.updated_at.to_rfc3339(),
         })

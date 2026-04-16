@@ -3,6 +3,8 @@ use crate::Scene;
 use nihility_store_operate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// 更新场景参数
@@ -14,8 +16,8 @@ pub struct UpdateSceneParam {
     pub name: Option<String>,
     /// 父场景ID（可选）
     pub parent_id: Option<Uuid>,
-    /// 场景元数据（可选）
-    pub metadata: Option<serde_json::Value>,
+    /// 场景Json元数据（可选）
+    pub metadata: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,16 +32,21 @@ pub struct UpdateSceneResult {
 
 impl Scene {
     pub async fn update_scene(&self, param: UpdateSceneParam) -> Result<UpdateSceneResult> {
+        let metadata = if let Some(metadata) = &param.metadata {
+            Some(Value::from_str(metadata)?)
+        } else {
+            None
+        };
         let model = nihility_store_operate::scene::update_scene(
             &self.db,
             param.id,
             param.name,
             param.parent_id,
-            param.metadata.clone(),
+            metadata,
         )
         .await?;
 
-        let metadata: serde_json::Value = model.metadata;
+        let metadata: Value = model.metadata;
 
         Ok(UpdateSceneResult {
             id: model.id,

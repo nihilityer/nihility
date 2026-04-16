@@ -14,6 +14,9 @@ pub enum SceneError {
     #[error(transparent)]
     Uuid(#[from] uuid::Error),
 
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+
     #[error("Scene not found: {0}")]
     NotFound(String),
 }
