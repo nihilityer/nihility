@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{debug, info};
+use uuid::Uuid;
 
 /// 连接新设备
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -20,6 +21,8 @@ pub struct ConnectDeviceParam {
     pub mapping_url: String,
     /// 屏幕映射网页中哪个元素
     pub screenshot_selector: Option<String>,
+    /// 设备对应的场景Id
+    pub scene_id: Uuid,
 }
 
 impl EdgeDeviceControl {
@@ -30,6 +33,7 @@ impl EdgeDeviceControl {
             ));
         }
         connect_device(
+            param.scene_id,
             param.device_id,
             param.mapping_url,
             param.screenshot_selector,
@@ -42,6 +46,7 @@ impl EdgeDeviceControl {
 }
 
 pub async fn connect_device(
+    scene_id: Uuid,
     device_id: String,
     mapping_url: String,
     screenshot_selector: Option<String>,
@@ -52,6 +57,15 @@ pub async fn connect_device(
     let device = devices_guard.get_mut(&device_id).ok_or_else(|| {
         EdgeDeviceControlError::DeviceStatus(format!("device {} not found", device_id))
     })?;
+    if let Some(scene_id_sender) = device.scene_id_sender.take()
+        && scene_id_sender.send(scene_id).is_ok()
+    {
+        debug!(?scene_id, "send scene id to audio handle");
+    } else {
+        return Err(EdgeDeviceControlError::DeviceStatus(
+            "failed to send scene id to audio handle".to_string(),
+        ));
+    }
 
     if let Some(task) = &device.screen_refresh_task {
         task.abort();

@@ -3,6 +3,7 @@ pub mod error;
 use crate::error::*;
 use nihility_module::{BoxStream, FunctionMetadata, Module};
 use nihility_module_edge_device_control::EdgeDeviceControl;
+use nihility_module_message_pool::MessagePool;
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -64,6 +65,7 @@ impl ModuleManager {
         let mut browser_control = None;
         let mut edge_device_control = None;
         let mut model = None;
+        let mut message_pool: Option<Arc<RwLock<MessagePool>>> = None;
 
         for enable_module in config.enable_modules {
             match enable_module {
@@ -97,10 +99,18 @@ impl ModuleManager {
                             );
                         }
                         if let Some(model) = model.as_ref() {
-                            module.set_model(model.clone()).await?;
+                            module.set_model(model.clone());
                         } else {
                             error!(
                                 "model module does not exist for module type: {:?}",
+                                embed_module
+                            );
+                        }
+                        if let Some(message_pool) = message_pool.as_ref() {
+                            module.set_message_pool(message_pool.clone());
+                        } else {
+                            error!(
+                                "message pool module does not exist for module type: {:?}",
                                 embed_module
                             );
                         }
@@ -120,6 +130,7 @@ impl ModuleManager {
                             )
                             .await?,
                         ));
+                        message_pool = Some(module.clone());
                         let monitor_module = module.clone();
                         tokio::spawn(nihility_module_message_pool::monitor_task(monitor_module));
                         modules.insert(ModuleType::Embed(embed_module), module);

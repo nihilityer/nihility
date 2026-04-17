@@ -6,7 +6,7 @@ use nihility_module_browser_control::BrowserControl;
 use std::collections::HashMap;
 use std::sync::Arc;
 pub(crate) use task::message_handle::start_message_handle;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -24,6 +24,7 @@ pub struct Device {
     pub key_handle_task: Option<JoinHandle<Result<()>>>,
     pub screen_refresh_task: Option<JoinHandle<Result<()>>>,
     pub cancellation_token: CancellationToken,
+    pub scene_id_sender: Option<oneshot::Sender<Uuid>>,
     pub audio_vad_task: Option<
         JoinHandle<core::result::Result<(), nihility_util_vad::error::VoiceActivityDetectionError>>,
     >,
@@ -40,6 +41,7 @@ impl Device {
             key_handle_task: None,
             screen_refresh_task: None,
             cancellation_token: CancellationToken::new(),
+            scene_id_sender: None,
             audio_vad_task: None,
             audio_handle_task: None,
         }

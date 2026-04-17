@@ -21,6 +21,9 @@ pub enum EdgeDeviceControlError {
     Model(#[from] nihility_module_model::error::ModelError),
 
     #[error(transparent)]
+    MessagePool(#[from] nihility_module_message_pool::error::MessagePoolError),
+
+    #[error(transparent)]
     Vad(#[from] nihility_util_vad::error::VoiceActivityDetectionError),
 
     #[error("Serialization error: {0}")]

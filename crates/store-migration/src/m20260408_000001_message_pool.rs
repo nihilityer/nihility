@@ -1,6 +1,7 @@
 use sea_orm_migration::prelude::extension::postgres::Type;
 use sea_orm_migration::sea_orm::DbBackend;
 use sea_orm_migration::{prelude::*, schema::*};
+use uuid::Uuid;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -13,12 +14,18 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Scene::Table)
                     .if_not_exists()
-                    .col(pk_uuid(Scene::Id))
+                    .col(pk_uuid(Scene::Id).default(Uuid::new_v4()))
                     .col(string_uniq(Scene::Name))
                     .col(uuid_null(Scene::ParentId))
                     .col(json_binary(Scene::Metadata))
-                    .col(timestamp_with_time_zone(Scene::CreatedAt))
-                    .col(timestamp_with_time_zone(Scene::UpdatedAt))
+                    .col(
+                        timestamp_with_time_zone(Scene::CreatedAt)
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        timestamp_with_time_zone(Scene::UpdatedAt)
+                            .default(Expr::current_timestamp()),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -54,7 +61,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Message::Table)
                     .if_not_exists()
-                    .col(pk_uuid(Message::Id))
+                    .col(pk_uuid(Message::Id).default(Uuid::new_v4()))
                     .col(uuid(Message::SceneId))
                     .col(enumeration(
                         Message::MsgType,
@@ -69,8 +76,14 @@ impl MigrationTrait for Migration {
                     .col(json_binary(Message::Content))
                     .col(json_binary(Message::Metadata))
                     .col(boolean(Message::IsProcessed).default(Expr::value(false)))
-                    .col(timestamp_with_time_zone(Message::CreatedAt))
-                    .col(timestamp_with_time_zone(Scene::UpdatedAt))
+                    .col(
+                        timestamp_with_time_zone(Message::CreatedAt)
+                            .default(Expr::current_timestamp()),
+                    )
+                    .col(
+                        timestamp_with_time_zone(Scene::UpdatedAt)
+                            .default(Expr::current_timestamp()),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_message_scene_id")

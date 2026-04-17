@@ -12,6 +12,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260330_000001_module_config::Migration),
             Box::new(m20260408_000001_message_pool::Migration),
             Box::new(m20260415_112507_add_message_group_id::Migration),
+            Box::new(m20260416_123542_base_scene::Migration),
         ]
     }
 }
@@ -20,3 +21,4 @@ mod m20260309_104447_user;
 mod m20260330_000001_module_config;
 mod m20260408_000001_message_pool;
 mod m20260415_112507_add_message_group_id;
+mod m20260416_123542_base_scene;

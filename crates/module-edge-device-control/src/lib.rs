@@ -8,6 +8,7 @@ use crate::device::register::register_device;
 use crate::device::Device;
 use axum::extract::ws::WebSocket;
 use nihility_module_browser_control::BrowserControl;
+use nihility_module_message_pool::MessagePool;
 use nihility_module_model::Model;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -17,6 +18,7 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 /// 自动连接设备配置
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
@@ -27,6 +29,8 @@ pub struct AutoConnectDevice {
     pub mapping_url: String,
     /// 屏幕映射网页中哪个元素
     pub screenshot_selector: Option<String>,
+    /// 设备对应的场景Id
+    pub scene_id: Uuid,
 }
 
 /// 边缘设备控制模块配置
@@ -45,9 +49,10 @@ pub struct EdgeDeviceControl {
     devices: Arc<RwLock<HashMap<String, Device>>>,
     browser_control: Option<Arc<RwLock<BrowserControl>>>,
     model: Option<Arc<RwLock<Model>>>,
+    message_pool: Option<Arc<RwLock<MessagePool>>>,
     web_socket_receive_task: Option<JoinHandle<Result<()>>>,
     register_timeout_secs: usize,
-    auto_connect: Arc<HashMap<String, (String, Option<String>)>>,
+    auto_connect: Arc<HashMap<String, AutoConnectDevice>>,
 }
 
 impl EdgeDeviceControl {
@@ -71,21 +76,17 @@ impl EdgeDeviceControl {
 
     pub async fn init(config: EdgeDeviceControlConfig) -> Result<Self> {
         let devices = Arc::new(RwLock::new(HashMap::new()));
-        let auto_connect: HashMap<String, (String, Option<String>)> = config
+        let auto_connect: HashMap<String, AutoConnectDevice> = config
             .auto_connect
             .iter()
-            .map(|ac| {
-                (
-                    ac.device_id.clone(),
-                    (ac.mapping_url.clone(), ac.screenshot_selector.clone()),
-                )
-            })
+            .map(|ac| (ac.device_id.clone(), ac.clone()))
             .collect();
         let module = EdgeDeviceControl {
             web_socket_sender: None,
             devices,
             browser_control: None,
             model: None,
+            message_pool: None,
             web_socket_receive_task: None,
             register_timeout_secs: config.register_timeout_secs,
             auto_connect: Arc::new(auto_connect),
@@ -94,9 +95,9 @@ impl EdgeDeviceControl {
     }
 
     pub async fn start_register_device(&mut self) -> Result<()> {
-        if self.model.is_none() || self.browser_control.is_none() {
+        if self.model.is_none() || self.browser_control.is_none() || self.message_pool.is_none() {
             return Err(EdgeDeviceControlError::DeviceStatus(
-                "Module model and browser_control is required".to_string(),
+                "Module model, message_pool, browser_control is required".to_string(),
             ));
         }
         let (web_socket_sender, mut web_socket_receiver) = mpsc::unbounded_channel::<WebSocket>();
@@ -104,6 +105,7 @@ impl EdgeDeviceControl {
         let web_socket_devices = self.devices.clone();
         let register_timeout_secs = self.register_timeout_secs;
         let model = self.model.as_ref().unwrap().clone();
+        let message_pool = self.message_pool.as_ref().unwrap().clone();
         let browser_control = self.browser_control.as_ref().unwrap().clone();
         let auto_connect = self.auto_connect.clone();
         let web_socket_receive_task = tokio::spawn(async move {
@@ -114,6 +116,7 @@ impl EdgeDeviceControl {
                     register_device(
                         web_socket,
                         model.clone(),
+                        message_pool.clone(),
                         web_socket_devices.clone(),
                         browser_control.clone(),
                         auto_connect.clone(),
@@ -155,9 +158,13 @@ impl EdgeDeviceControl {
     }
 
     /// 设置模型模块引用
-    pub async fn set_model(&mut self, model: Arc<RwLock<Model>>) -> Result<()> {
+    pub fn set_model(&mut self, model: Arc<RwLock<Model>>) {
         self.model = Some(model);
-        Ok(())
+    }
+
+    /// 设置消息池模块引用
+    pub fn set_message_pool(&mut self, message_pool: Arc<RwLock<MessagePool>>) {
+        self.message_pool = Some(message_pool);
     }
 
     /// 获取WebSocket的发送者，用于传递设备的WebSocket流到设备控制模块

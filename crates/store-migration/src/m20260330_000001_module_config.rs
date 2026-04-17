@@ -1,4 +1,5 @@
 use sea_orm_migration::{prelude::*, schema::*};
+use uuid::Uuid;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -11,7 +12,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(ModuleConfig::Table)
                     .if_not_exists()
-                    .col(pk_uuid(ModuleConfig::Id))
+                    .col(pk_uuid(ModuleConfig::Id).default(Uuid::new_v4()))
                     .col(string_uniq(ModuleConfig::ModuleName))
                     .col(json_binary(ModuleConfig::ConfigValue))
                     .col(json_binary(ModuleConfig::JsonSchema))
